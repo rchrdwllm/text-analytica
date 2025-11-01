@@ -13,10 +13,12 @@ import {
 
 const CorpusTopics = () => {
   return (
-    <main className="space-y-4 p-6 min-h-full">
-      <h1 className="font-semibold text-2xl">Corpus Topics</h1>
+    <main className="p-6 min-h-full">
+      <h1 className="top-6 sticky self-start mb-4 font-semibold text-2xl">
+        Corpus Topics
+      </h1>
       <div className="flex gap-4">
-        <aside className="space-y-4 w-full max-w-[320px]">
+        <aside className="top-[calc(2.5rem+31.99px)] sticky self-start space-y-4 rounded-lg w-full max-w-[320px] h-[calc(100vh-1.5rem-31.99px-2.5rem)] overflow-y-auto scrollbar-hide">
           <Select defaultValue="arxiv">
             <SelectTrigger className="bg-none border-none w-full">
               <SelectValue placeholder="Select corpus" />
