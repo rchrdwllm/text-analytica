@@ -14,14 +14,14 @@ const NavLink = ({ label, href, Icon }: NavItem) => {
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2 hover:bg-primary/10 p-3 rounded-lg hover:text-primary transition-colors",
+        "flex items-center gap-3 hover:bg-primary/10 p-3 rounded-lg hover:text-primary transition-colors",
         isActive
           ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
           : ""
       )}
     >
       <span>
-        <Icon />
+        <Icon className="size-5" />
       </span>
       {label}
     </Link>
