@@ -4,7 +4,7 @@ import re
 from collections import Counter
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"])
+CORS(app, origins=["http://localhost:3000", "https://text-analytica.vercel.app"])
 
 @app.route('/api/health', methods=['GET'])
 def health():
