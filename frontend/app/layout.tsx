@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fira_Sans, Fira_Mono } from "next/font/google";
 import "./globals.css";
 import LayoutWrapper from "@/components/layout/layout-wrapper";
+import Toploader from "nextjs-toploader";
 
 const firaSans = Fira_Sans({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body
         className={`antialiased ${firaSans.variable} ${firaMono.variable} ${firaSans.className}`}
       >
+        <Toploader color="var(--primary)" showSpinner={false} />
         <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
