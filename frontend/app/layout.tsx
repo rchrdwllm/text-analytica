@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fira_Sans, Fira_Mono } from "next/font/google";
 import "./globals.css";
+import LayoutWrapper from "@/components/layout/layout-wrapper";
 
 const firaSans = Fira_Sans({
   subsets: ["latin"],
@@ -32,7 +33,7 @@ export default function RootLayout({
       <body
         className={`antialiased ${firaSans.variable} ${firaMono.variable} ${firaSans.className}`}
       >
-        {children}
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );
