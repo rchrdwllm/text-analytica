@@ -18,75 +18,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type AuthorData = {
-  author: string;
+type DocumentData = {
   document: string;
-  neighbors: string;
-  centralityScore: string;
+  author: string;
 };
 
-const data: AuthorData[] = [
+const data: DocumentData[] = [
   {
-    author: "A, B, C",
-    document: "An Empirical Analysis of Search in GSAT",
-    neighbors: "D, E, F, G",
-    centralityScore: "96.4%",
+    document: "A Market-Oriented Progr...",
+    author: "M. P. Wellman",
   },
   {
-    author: "D, E, F",
-    document:
-      "Software Agents: Completing Patterns and Constructing User Interfaces",
-    neighbors: "A, B, H, I",
-    centralityScore: "85.2%",
-  },
-  {
-    author: "G, H",
-    document: "Machine Learning Applications in Natural Language Processing",
-    neighbors: "C, D, J, K",
-    centralityScore: "78.9%",
-  },
-  {
-    author: "I, J, K",
-    document: "Deep Neural Networks for Image Recognition",
-    neighbors: "E, F, L, M",
-    centralityScore: "92.1%",
-  },
-  {
-    author: "L, M, N",
-    document: "Reinforcement Learning in Autonomous Systems",
-    neighbors: "G, H, O, P",
-    centralityScore: "88.7%",
+    document: "An Empirical Analysis of...",
+    author: "I. P. Gent",
   },
 ];
 
-const columns: ColumnDef<AuthorData>[] = [
-  {
-    accessorKey: "author",
-    header: "Author",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("author")}</div>
-    ),
-  },
+const columns: ColumnDef<DocumentData>[] = [
   {
     accessorKey: "document",
     header: "Document",
     cell: ({ row }) => <div>{row.getValue("document")}</div>,
   },
   {
-    accessorKey: "neighbors",
-    header: "Neighbors",
-    cell: ({ row }) => <div>{row.getValue("neighbors")}</div>,
-  },
-  {
-    accessorKey: "centralityScore",
-    header: () => <div className="text-right">Centrality Score</div>,
-    cell: ({ row }) => (
-      <div className="text-right">{row.getValue("centralityScore")}</div>
-    ),
+    accessorKey: "author",
+    header: "Author",
+    cell: ({ row }) => <div>{row.getValue("author")}</div>,
   },
 ];
 
-const AuthorsTable = () => {
+const SimilarDocuments = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
@@ -101,8 +62,8 @@ const AuthorsTable = () => {
   });
 
   return (
-    <article className="bg-card p-4 rounded-lg">
-      <h2 className="mb-4 font-medium text-xl">Authors</h2>
+    <article className="space-y-4 bg-card p-4 rounded-lg">
+      <h2 className="font-medium text-lg">Similar Documents</h2>
       <div className="rounded-md">
         <Table>
           <TableHeader>
@@ -155,4 +116,4 @@ const AuthorsTable = () => {
   );
 };
 
-export default AuthorsTable;
+export default SimilarDocuments;
