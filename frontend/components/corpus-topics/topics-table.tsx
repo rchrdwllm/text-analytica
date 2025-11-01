@@ -1,7 +1,7 @@
 "use client";
 
 import { ExpandedState } from "@tanstack/react-table";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Table,
   TableBody,
@@ -76,7 +76,7 @@ const TopicsTable = () => {
           </TableHeader>
           <TableBody>
             {data.map((topicGroup, groupIndex) => (
-              <>
+              <Fragment key={groupIndex}>
                 {topicGroup.documents.map((doc, docIndex) => (
                   <TableRow key={`${groupIndex}-${docIndex}`}>
                     {docIndex === 0 ? (
@@ -93,7 +93,7 @@ const TopicsTable = () => {
                     </TableCell>
                   </TableRow>
                 ))}
-              </>
+              </Fragment>
             ))}
           </TableBody>
         </Table>
