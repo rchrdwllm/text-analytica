@@ -1,7 +1,13 @@
 "use client";
 
+import {
+  SearchCorpusSchema,
+  SearchCorpusSchemaType,
+} from "@/schemas/SearchCorpusSchema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Search } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { Plus, Search } from "lucide-react";
+import { Button } from "../ui/button";
 import {
   Form,
   FormControl,
@@ -14,12 +20,6 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "../ui/input-group";
-import {
-  SearchCorpusSchema,
-  SearchCorpusSchemaType,
-} from "@/schemas/SearchCorpusSchema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "../ui/button";
 
 const SearchCorpusForm = () => {
   const form = useForm<SearchCorpusSchemaType>({
@@ -49,9 +49,6 @@ const SearchCorpusForm = () => {
             </FormItem>
           )}
         />
-        <Button type="button" variant="secondary">
-          Add a topic tag <Plus />
-        </Button>
         <Button type="submit" className="ml-auto">
           Search
         </Button>
