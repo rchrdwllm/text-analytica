@@ -19,7 +19,8 @@ import ast
 import json
 from wordcloud import WordCloud
 import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+
+matplotlib.use("Agg")  # Use non-interactive backend
 import matplotlib.pyplot as plt
 
 import re
@@ -32,6 +33,7 @@ dataset_df: pd.DataFrame = None
 all_authors: nx.MultiGraph = None
 all_topics: dict[str, tuple[LdaMulticore, int, pd.DataFrame]] = {}
 
+
 def save_pickle(path: str, object: Any):
     path_obj = Path("pickles") / path
     if not path_obj.parent.exists():
@@ -40,6 +42,7 @@ def save_pickle(path: str, object: Any):
     with open(path_obj, "wb") as f:
         pickle.dump(object, f)
 
+
 def load_pickle(path: str) -> Any | None:
     path_obj = Path("pickles") / path
     if path_obj.exists():
@@ -47,19 +50,21 @@ def load_pickle(path: str) -> Any | None:
             return pickle.load(f)
     return None
 
+
 def preprocess_text(text):
     # Convert to lowercase
     text = text.lower()
     # Remove non-alphanumeric characters and tokenize
-    text = re.sub(r'[^a-z\s]', '', text)
+    text = re.sub(r"[^a-z\s]", "", text)
     tokens = nltk.word_tokenize(text)
     # Remove stop words
-    stop_words = set(stopwords.words('english'))
+    stop_words = set(stopwords.words("english"))
     tokens = [word for word in tokens if word not in stop_words]
     # Lemmatization
     lemmatizer = WordNetLemmatizer()
     tokens = [lemmatizer.lemmatize(word) for word in tokens]
     return tokens
+
 
 def parse_date(string: str):
     match list(map(int, string.split("/"))):
@@ -241,7 +246,9 @@ def corpus_documents():
                         topic_keywords = []
                         for topic_id, prob in top_topics:
                             # Get top 5 words for this topic
-                            words = [word for word, _ in model.show_topic(topic_id, topn=3)]
+                            words = [
+                                word for word, _ in model.show_topic(topic_id, topn=3)
+                            ]
                             topic_keywords.append(f"{', '.join(words)} ({prob:.2f})")
                         topics_str = " | ".join(topic_keywords)
 
@@ -269,7 +276,7 @@ def topic_count_per_group():
     Returns the topic count per group.
     """
     result = [
-        { "group": group_name, "topic_count": num_topics }
+        {"group": group_name, "topic_count": num_topics}
         for group_name, (_, num_topics, _) in all_topics.items()
     ]
 
@@ -306,11 +313,15 @@ def trending_topics_per_group():
                     return -1
 
                 # Vectorized operation using pandas apply
-                valid_summaries = df['processed_summary'].notna()
-                dominant_topics = df[valid_summaries]['processed_summary'].apply(get_dominant_topic)
+                valid_summaries = df["processed_summary"].notna()
+                dominant_topics = df[valid_summaries]["processed_summary"].apply(
+                    get_dominant_topic
+                )
 
                 # Count documents per topic using value_counts
-                topic_counts = dominant_topics[dominant_topics >= 0].value_counts().to_dict()
+                topic_counts = (
+                    dominant_topics[dominant_topics >= 0].value_counts().to_dict()
+                )
             else:
                 topic_counts = {}
 
@@ -318,7 +329,8 @@ def trending_topics_per_group():
                 # Get top 10 words for this topic
                 top_words = model.show_topic(topic_id, topn=10)
                 keywords = [
-                    {"word": word, "weight": float(weight)} for word, weight in top_words
+                    {"word": word, "weight": float(weight)}
+                    for word, weight in top_words
                 ]
 
                 # Get document count from precomputed counts
@@ -351,11 +363,9 @@ def corpus_topics():
     topics_by_group = []
 
     for group_name, (model, num_topics, df) in all_topics.items():
-        topics_by_group.append({
-            "group_name": group_name,
-            "topics": num_topics,
-            "total_documents": len(df)
-        })
+        topics_by_group.append(
+            {"group_name": group_name, "topics": num_topics, "total_documents": len(df)}
+        )
 
     return jsonify(topics_by_group)
 
@@ -369,7 +379,10 @@ def corpus_topics_detail(year_group):
 
     # Find the model and data for the specified year group
     if year_group not in all_topics:
-        return jsonify({"error": f"Year group '{year_group}' not found"}), HTTPStatus.NOT_FOUND
+        return (
+            jsonify({"error": f"Year group '{year_group}' not found"}),
+            HTTPStatus.NOT_FOUND,
+        )
 
     if (to_return := load_pickle(f"corpus_topics/{year_group}.pkl")) is None:
         model, num_topics, df = all_topics[year_group]
@@ -390,13 +403,15 @@ def corpus_topics_detail(year_group):
                     return dominant[0], dominant[1]  # topic_id, confidence
                 return -1, 0.0
 
-            valid_summaries = df['processed_summary'].notna()
+            valid_summaries = df["processed_summary"].notna()
             df_copy = df[valid_summaries].copy()
 
             # Apply function to get both topic and confidence
-            topic_confidence = df_copy['processed_summary'].apply(get_dominant_topic_with_confidence)
-            df_copy['dominant_topic'] = topic_confidence.apply(lambda x: x[0])
-            df_copy['topic_confidence'] = topic_confidence.apply(lambda x: x[1])
+            topic_confidence = df_copy["processed_summary"].apply(
+                get_dominant_topic_with_confidence
+            )
+            df_copy["dominant_topic"] = topic_confidence.apply(lambda x: x[0])
+            df_copy["topic_confidence"] = topic_confidence.apply(lambda x: x[1])
 
             # Group documents by dominant topic
             for topic_id in range(num_topics):
@@ -405,22 +420,21 @@ def corpus_topics_detail(year_group):
                 topic_label = ", ".join([word for word, _ in topic_words])
 
                 # Get documents where this is the dominant topic
-                topic_docs = df_copy[df_copy['dominant_topic'] == topic_id]
+                topic_docs = df_copy[df_copy["dominant_topic"] == topic_id]
 
                 # Sort by confidence score and limit to top 10 documents
-                topic_docs = topic_docs.sort_values('topic_confidence', ascending=False)
+                topic_docs = topic_docs.sort_values("topic_confidence", ascending=False)
 
                 documents = []
                 for _, row in topic_docs.head(10).iterrows():
-                    documents.append({
-                        "title": row.get("title", "Unknown"),
-                        "confidence": float(row['topic_confidence'])
-                    })
+                    documents.append(
+                        {
+                            "title": row.get("title", "Unknown"),
+                            "confidence": float(row["topic_confidence"]),
+                        }
+                    )
 
-                to_return.append({
-                    "topic": topic_label,
-                    "documents": documents
-                })
+                to_return.append({"topic": topic_label, "documents": documents})
         save_pickle(f"corpus_topics/{year_group}.pkl", to_return)
 
     return jsonify(to_return)
@@ -473,35 +487,35 @@ def author_networks():
             for _, doc in df.iterrows():
                 authors_list = parse_authors_field(doc.get("authors"))
                 if author_name in authors_list:
-                        # Add paper node
-                        paper_id = doc.get("title", "Unknown")
-                        if paper_id not in added_nodes:
-                            nodes.append(
-                                {"id": paper_id, "group": "paper", "year": group_name}
-                            )
-                            added_nodes.add(paper_id)
+                    # Add paper node
+                    paper_id = doc.get("title", "Unknown")
+                    if paper_id not in added_nodes:
+                        nodes.append(
+                            {"id": paper_id, "group": "paper", "year": group_name}
+                        )
+                        added_nodes.add(paper_id)
 
-                        # Link author to paper
-                        link_key = (author_name, paper_id)
-                        if link_key not in added_links:
-                            links.append(
-                                {"source": author_name, "target": paper_id, "value": 1}
-                            )
-                            added_links.add(link_key)
+                    # Link author to paper
+                    link_key = (author_name, paper_id)
+                    if link_key not in added_links:
+                        links.append(
+                            {"source": author_name, "target": paper_id, "value": 1}
+                        )
+                        added_links.add(link_key)
 
-                        # Link co-authors to the same paper
-                        for co_author in authors_list:
-                            if co_author != author_name and co_author in added_nodes:
-                                link_key = (co_author, paper_id)
-                                if link_key not in added_links:
-                                    links.append(
-                                        {
-                                            "source": co_author,
-                                            "target": paper_id,
-                                            "value": 1,
-                                        }
-                                    )
-                                    added_links.add(link_key)
+                    # Link co-authors to the same paper
+                    for co_author in authors_list:
+                        if co_author != author_name and co_author in added_nodes:
+                            link_key = (co_author, paper_id)
+                            if link_key not in added_links:
+                                links.append(
+                                    {
+                                        "source": co_author,
+                                        "target": paper_id,
+                                        "value": 1,
+                                    }
+                                )
+                                added_links.add(link_key)
 
     response = {
         "nodes": nodes,
@@ -531,7 +545,10 @@ def author_networks_get():
         added_links = set()
 
         if author_name not in all_authors:
-            return jsonify({"nodes": [], "links": [], "message": "Author not found"}), 200
+            return (
+                jsonify({"nodes": [], "links": [], "message": "Author not found"}),
+                200,
+            )
 
         # Calculate paper counts for all authors first
         author_paper_counts = {}
@@ -540,9 +557,17 @@ def author_networks_get():
                 for _, doc in df.iterrows():
                     authors_list = parse_authors_field(doc.get("authors"))
                     for author in authors_list:
-                        author_paper_counts[author] = author_paper_counts.get(author, 0) + 1
+                        author_paper_counts[author] = (
+                            author_paper_counts.get(author, 0) + 1
+                        )
 
-        nodes.append({"id": author_name, "group": "author", "paper_count": author_paper_counts.get(author_name, 0)})
+        nodes.append(
+            {
+                "id": author_name,
+                "group": "author",
+                "paper_count": author_paper_counts.get(author_name, 0),
+            }
+        )
         added_nodes.add(author_name)
 
         neighbors = list(all_authors.neighbors(author_name))
@@ -550,13 +575,22 @@ def author_networks_get():
         for co_author in neighbors[:50]:
             if co_author not in added_nodes:
                 weight = all_authors[author_name][co_author].get("weight", 1)
-                nodes.append({"id": co_author, "group": "co-author", "weight": weight, "paper_count": author_paper_counts.get(co_author, 0)})
+                nodes.append(
+                    {
+                        "id": co_author,
+                        "group": "co-author",
+                        "weight": weight,
+                        "paper_count": author_paper_counts.get(co_author, 0),
+                    }
+                )
                 added_nodes.add(co_author)
 
             link_key = tuple(sorted([author_name, co_author]))
             if link_key not in added_links:
                 weight = all_authors[author_name][co_author].get("weight", 1)
-                links.append({"source": author_name, "target": co_author, "value": weight})
+                links.append(
+                    {"source": author_name, "target": co_author, "value": weight}
+                )
                 added_links.add(link_key)
 
         # papers
@@ -565,22 +599,32 @@ def author_networks_get():
                 for _, doc in df.iterrows():
                     authors_list = parse_authors_field(doc.get("authors"))
                     if author_name in authors_list:
-                            paper_id = doc.get("title", "Unknown")
-                            if paper_id not in added_nodes:
-                                nodes.append({"id": paper_id, "group": "paper", "year": group_name})
-                                added_nodes.add(paper_id)
+                        paper_id = doc.get("title", "Unknown")
+                        if paper_id not in added_nodes:
+                            nodes.append(
+                                {"id": paper_id, "group": "paper", "year": group_name}
+                            )
+                            added_nodes.add(paper_id)
 
-                            link_key = (author_name, paper_id)
-                            if link_key not in added_links:
-                                links.append({"source": author_name, "target": paper_id, "value": 1})
-                                added_links.add(link_key)
+                        link_key = (author_name, paper_id)
+                        if link_key not in added_links:
+                            links.append(
+                                {"source": author_name, "target": paper_id, "value": 1}
+                            )
+                            added_links.add(link_key)
 
-                            for co_author in authors_list:
-                                if co_author != author_name and co_author in added_nodes:
-                                    link_key = (co_author, paper_id)
-                                    if link_key not in added_links:
-                                        links.append({"source": co_author, "target": paper_id, "value": 1})
-                                        added_links.add(link_key)
+                        for co_author in authors_list:
+                            if co_author != author_name and co_author in added_nodes:
+                                link_key = (co_author, paper_id)
+                                if link_key not in added_links:
+                                    links.append(
+                                        {
+                                            "source": co_author,
+                                            "target": paper_id,
+                                            "value": 1,
+                                        }
+                                    )
+                                    added_links.add(link_key)
 
         # Calculate statistics
         statistics = {
@@ -597,7 +641,10 @@ def author_networks_get():
     links = []
     # compute weighted degree for node sizing
     try:
-        weighted_degrees = {n: int(all_authors.degree(n, weight="weight") or 0) for n in all_authors.nodes()}
+        weighted_degrees = {
+            n: int(all_authors.degree(n, weight="weight") or 0)
+            for n in all_authors.nodes()
+        }
     except Exception:
         weighted_degrees = {n: 0 for n in all_authors.nodes()}
 
@@ -613,14 +660,16 @@ def author_networks_get():
     # limit nodes to first 1000 and links to first 2000 to keep payload reasonable
     node_list = list(all_authors.nodes())[:1000]
     node_set = set(node_list)  # Create a set for O(1) lookup
-    
+
     for n in node_list:
-        nodes.append({
-            "id": n, 
-            "group": "author", 
-            "weight": weighted_degrees.get(n, 0),
-            "paper_count": author_paper_counts.get(n, 0)
-        })
+        nodes.append(
+            {
+                "id": n,
+                "group": "author",
+                "weight": weighted_degrees.get(n, 0),
+                "paper_count": author_paper_counts.get(n, 0),
+            }
+        )
 
     # Only include edges where BOTH nodes are in our selected node set
     for u, v, data in all_authors.edges(data=True):
@@ -629,7 +678,13 @@ def author_networks_get():
             if len(links) >= 2000:  # Still limit total links
                 break
 
-    return jsonify({"nodes": nodes, "links": links, "statistics": {"nodes": len(nodes), "links": len(links)}})
+    return jsonify(
+        {
+            "nodes": nodes,
+            "links": links,
+            "statistics": {"nodes": len(nodes), "links": len(links)},
+        }
+    )
 
 
 @app.route("/api/network-statistics")
@@ -650,7 +705,7 @@ def network_statistics():
             "nodes": nodes,
             "edges": edges,
             "communities": communities,
-            "average_degree": average_degree
+            "average_degree": average_degree,
         }
 
         save_pickle("network_statistics.pkl", to_return)
@@ -841,7 +896,7 @@ def corpus_wordcloud(year_group):
                 break
 
         if lda_model is None or num_topics is None:
-            return { "error": f"Group {year_group} not found" }, HTTPStatus.NOT_FOUND
+            return {"error": f"Group {year_group} not found"}, HTTPStatus.NOT_FOUND
 
         # Collect all words from all documents across all year groups
         print(f"\n{'='*70}")
@@ -853,7 +908,9 @@ def corpus_wordcloud(year_group):
         rows = (num_topics + cols - 1) // cols  # Ceiling division
 
         fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
-        fig.suptitle(f'Topic Word Clouds - {year_group}', fontsize=16, fontweight='bold')
+        fig.suptitle(
+            f"Topic Word Clouds - {year_group}", fontsize=16, fontweight="bold"
+        )
 
         # Flatten axes array for easier iteration
         if rows == 1 and cols == 1:
@@ -876,34 +933,36 @@ def corpus_wordcloud(year_group):
             wordcloud = WordCloud(
                 width=400,
                 height=300,
-                background_color='white',
-                colormap='viridis',
+                background_color="white",
+                colormap="viridis",
                 relative_scaling=0.5,
-                min_font_size=8
+                min_font_size=8,
             ).generate_from_frequencies(word_freq)
 
             # Display word cloud
-            ax.imshow(wordcloud, interpolation='bilinear')
-            ax.axis('off')
+            ax.imshow(wordcloud, interpolation="bilinear")
+            ax.axis("off")
 
             # Get top 3 words for title
-            top_words = ', '.join([word for word, _ in topic_words[:3]])
-            ax.set_title(f'Topic {topic_id + 1}: {top_words}', fontsize=10, fontweight='bold')
+            top_words = ", ".join([word for word, _ in topic_words[:3]])
+            ax.set_title(
+                f"Topic {topic_id + 1}: {top_words}", fontsize=10, fontweight="bold"
+            )
 
         # Hide any unused subplots
         for idx in range(num_topics, len(axes)):
-            axes[idx].axis('off')
+            axes[idx].axis("off")
 
         # Adjust layout and save the figure with all subplots
         plt.tight_layout()
 
         # Save to file
         buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=150, bbox_inches='tight')
+        fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
         plt.close(fig)
         buf.seek(0)
 
-        return send_file(buf, mimetype='image/png')
+        return send_file(buf, mimetype="image/png")
 
     except Exception as e:
         return jsonify({"error": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
@@ -916,11 +975,13 @@ if __name__ == "__main__":
     try:
         nltk.data.find("corpora/stopwords")
         nltk.data.find("tokenizers/punkt")
+        nltk.data.find("tokenizers/punkt_tab")
         nltk.data.find("corpora/wordnet")
     except LookupError:
         print("Downloading NLTK data...")
         nltk.download("stopwords", quiet=True)
         nltk.download("punkt", quiet=True)
+        nltk.download("punkt_tab", quiet=True)
         nltk.download("wordnet", quiet=True)
 
     print("Loading dataset...")

@@ -43,3 +43,13 @@ Start-Backend
 Write-Host "`nBoth servers are starting in separate windows..." -ForegroundColor Green
 Write-Host "Press any key to exit this script (servers will continue running)..." -ForegroundColor Gray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+# In the Start-Frontend function, modify the bun/npm lines:
+
+if ($bunInstalled) {
+    Write-Host "Using bun for frontend..." -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$env:NODE_OPTIONS='--no-deprecation'; cd '$PSScriptRoot\frontend'; bun dev"
+} else {
+    Write-Host "Bun not found. Using npm for frontend..." -ForegroundColor Yellow
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "`$env:NODE_OPTIONS='--no-deprecation'; cd '$PSScriptRoot\frontend'; npm run dev"
+}
