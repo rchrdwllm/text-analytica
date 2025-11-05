@@ -262,7 +262,6 @@ def corpus_topics():
     Returns topics per year and a single overall word cloud for the entire corpus.
     """
     topics_by_year = []
-    
     # Aggregate ALL words across ALL topics and ALL years for overall word cloud
     overall_word_weights = {}
 
@@ -295,7 +294,6 @@ def corpus_topics():
                     "document_count": doc_count
                 }
             )
-            
             # Accumulate words for overall word cloud
             for word, weight in top_words:
                 if word in overall_word_weights:
