@@ -1,7 +1,15 @@
 "use client";
 
+import { submitPaperAnalysis } from "@/actions/paperAnalysis";
+import { cn } from "@/lib/utils";
+import {
+  UploadFormSchema,
+  UploadFormSchemaType,
+} from "@/schemas/UploadFormSchema";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Share } from "lucide-react";
-import { Textarea } from "../ui/textarea";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { Button } from "../ui/button";
 import {
   Form,
@@ -10,15 +18,7 @@ import {
   FormItem,
   FormMessage,
 } from "../ui/form";
-import { useForm } from "react-hook-form";
-import { useRef, useState } from "react";
-import { submitPaperAnalysis } from "@/actions/paperAnalysis";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  UploadFormSchema,
-  UploadFormSchemaType,
-} from "@/schemas/UploadFormSchema";
-import { cn } from "@/lib/utils";
+import { Textarea } from "../ui/textarea";
 
 type UploadFormProps = {
   onAnalysis?: (res: any) => void;
@@ -34,6 +34,17 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const rawSummary = form.watch("rawSummary");
+
+  useEffect(() => {
+    if (!rawSummary && !selectedFile) {
+      setDisabled(false);
+      onAnalysis?.(null);
+    }
+  }, [rawSummary, selectedFile, onAnalysis]);
 
   const handleFileUploadClick = () => {
     fileInputRef.current?.click();
@@ -47,7 +58,6 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
 
     if (file) {
       setSelectedFile(file);
-
       form.setValue("file", file);
     }
   };
@@ -63,7 +73,6 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
           rawSummary: data.rawSummary,
         });
 
-        // propagate result to parent if provided
         onAnalysis?.(result);
         setDisabled(true);
       } catch (err: any) {
@@ -73,9 +82,6 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
       }
     })();
   };
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   return (
     <article className="space-y-4 bg-card p-4 rounded-lg">
@@ -88,7 +94,11 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <Textarea placeholder="Paste raw summary here" {...field} />
+                  <Textarea
+                    placeholder="Paste raw summary here"
+                    {...field}
+                    disabled={disabled && !!selectedFile}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -107,7 +117,11 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
             name="file"
             render={() => (
               <FormItem
-                className={cn(disabled ? "opacity-50 pointer-events-none" : "")}
+                className={cn(
+                  disabled && !!rawSummary
+                    ? "opacity-50 pointer-events-none"
+                    : ""
+                )}
               >
                 <FormControl>
                   <div
