@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  LabelList,
+  ResponsiveContainer,
   XAxis,
   YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  LabelList,
 } from "recharts";
 
 import {
@@ -15,19 +15,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-
-const data = [
-  { year: "'16", count: 70 },
-  { year: "'17", count: 90 },
-  { year: "'18", count: 100 },
-  { year: "'19", count: 92 },
-  { year: "'20", count: 84 },
-  { year: "'21", count: 84 },
-  { year: "'22", count: 30 },
-  { year: "'23", count: 102 },
-  { year: "'24", count: 98 },
-  { year: "'25", count: 96 },
-];
+import { DocumentTopicCount, getTopicCountPerGroup } from "@/lib/dashboard";
+import { useEffect, useState } from "react";
 
 const TopLabel = (props: any) => {
   const { x, y, value, width } = props;
@@ -47,21 +36,34 @@ const TopLabel = (props: any) => {
 };
 
 const TopicCountPerYear = () => {
+  const [documents, setDocuments] = useState<DocumentTopicCount[]>([]);
+  useEffect(() => {
+    let isCancelled = false;
+    (async () => {
+      const { documents } = await getTopicCountPerGroup();
+      if (isCancelled) return;
+
+      setDocuments(documents);
+    })();
+
+    return () => {isCancelled = true;};
+  }, []);
+
   return (
     <article className="flex flex-col space-y-2 bg-card p-4 rounded-lg h-full">
-      <h2 className="font-medium text-lg">Topic Count per Year</h2>
+      <h2 className="font-medium text-lg">Topic Count per Group</h2>
       <ChartContainer
         config={{ count: { color: "var(--chart-5)" } }}
         className="flex-1 w-full [&_.recharts-bar-rectangle]:transition-all"
       >
         <ResponsiveContainer>
           <BarChart
-            data={data}
+            data={documents}
             margin={{ top: 24, right: 8, left: 0, bottom: 0 }}
           >
             <CartesianGrid vertical={false} stroke="transparent" />
             <XAxis
-              dataKey="year"
+              dataKey="group"
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 12 }}
@@ -80,13 +82,13 @@ const TopicCountPerYear = () => {
             <ChartTooltip content={<ChartTooltipContent />} />
 
             <Bar
-              dataKey="count"
+              dataKey="topicCount"
               name="Topics"
               fill="var(--color-count)"
               barSize={32}
             >
               <LabelList
-                dataKey="count"
+                dataKey="topicCount"
                 content={(props) => <TopLabel {...props} />}
               />
             </Bar>
