@@ -1,8 +1,10 @@
 from http import HTTPStatus
+from pathlib import Path
+from typing import Any
 import pandas as pd
 import os
 from gensim.models import LdaMulticore
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from functools import cache
 import kagglehub
@@ -14,16 +16,50 @@ from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 import ast
 import json
+from wordcloud import WordCloud
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+from collections import Counter
+
+import re
 from scipy.spatial.distance import cosine
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "https://text-analytica.vercel.app"])
+CORS(app)
 
 # Global object
 dataset_df: pd.DataFrame = None
 all_authors: nx.MultiGraph = None
 all_topics: dict[str, tuple[LdaMulticore, int, pd.DataFrame]] = {}
 
+def save_pickle(path: str, object: Any):
+    path_obj = Path(path)
+    if not os.path.exists(path_obj.parent):
+        os.makedirs(path_obj.parent)
+
+    with open(path_obj, "wb") as f:
+        pickle.dump(object, f)
+
+def load_pickle(path: str) -> Any | None:
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    return None
+
+def preprocess_text(text):
+    # Convert to lowercase
+    text = text.lower()
+    # Remove non-alphanumeric characters and tokenize
+    text = re.sub(r'[^a-z\s]', '', text)
+    tokens = nltk.word_tokenize(text)
+    # Remove stop words
+    stop_words = set(stopwords.words('english'))
+    tokens = [word for word in tokens if word not in stop_words]
+    # Lemmatization
+    lemmatizer = WordNetLemmatizer()
+    tokens = [lemmatizer.lemmatize(word) for word in tokens]
+    return tokens
 
 def parse_date(string: str):
     match list(map(int, string.split("/"))):
@@ -155,11 +191,7 @@ def load_author_graph():
 
 def load_topics():
     global all_topics
-    if os.path.exists("all_lda_models.pkl"):
-        with open("all_lda_models.pkl", "rb") as f:
-            all_topics = pickle.load(f)
-            return
-    raise Exception()
+    all_topics = load_pickle("all_lda_models.pkl")
 
 
 @app.route("/api/health")
@@ -267,10 +299,11 @@ def trending_topics_per_year():
 
             # Calculate topic prevalence by counting how many documents have this as dominant topic
             topic_count = 0
-            if "processed_summary" in df.columns:
+            if "summary" in df.columns:
                 for _, row in df.iterrows():
-                    if row.get("processed_summary"):
-                        bow = model.id2word.doc2bow(row["processed_summary"])
+                    if row.get("summary"):
+                        processed_summary = preprocess_text(row.get("summary"))
+                        bow = model.id2word.doc2bow(processed_summary)
                         doc_topics = model.get_document_topics(bow)
                         if doc_topics:
                             dominant_topic = max(doc_topics, key=lambda x: x[1])[0]
@@ -348,20 +381,20 @@ def corpus_topics():
             "topics": topics_list,
             "total_documents": len(df)
         })
-    
+
     # Prepare overall word cloud (top 100 words across entire corpus)
     sorted_overall = sorted(
         overall_word_weights.items(),
         key=lambda x: x[1],
         reverse=True
     )[:100]
-    
+
     # Normalize weights to 0-100 scale for word cloud
     if sorted_overall:
         max_weight = max([weight for _, weight in sorted_overall])
         min_weight = min([weight for _, weight in sorted_overall])
         weight_range = max_weight - min_weight if max_weight != min_weight else 1
-        
+
         overall_wordcloud = [
             {
                 "text": word,
@@ -454,7 +487,6 @@ def author_networks():
                                         }
                                     )
                                     added_links.add(link_key)
-                
 
     response = {
         "nodes": nodes,
@@ -525,7 +557,6 @@ def author_networks_get():
                                     if link_key not in added_links:
                                         links.append({"source": co_author, "target": paper_id, "value": 1})
                                         added_links.add(link_key)
-                    
 
         response = {"nodes": nodes, "links": links}
         return jsonify(response)
@@ -550,6 +581,32 @@ def author_networks_get():
     return jsonify({"nodes": nodes, "links": links, "statistics": {"nodes": len(nodes), "links": len(links)}})
 
 
+@app.route("/api/network-statistics")
+def network_statistics():
+    if (to_return := load_pickle("network_statistics.pkl")) is None:
+        nodes = all_authors.number_of_nodes()
+        edges = all_authors.number_of_edges()
+
+        # Calculate number of communities using Louvain algorithm
+        undirected_graph = all_authors.to_undirected()
+        communities_generator = nx.community.louvain_communities(undirected_graph)
+        communities = len(list(communities_generator))
+
+        # Calculate average degree
+        degrees = [degree for _, degree in all_authors.degree()]
+        average_degree = sum(degrees) / len(degrees) if degrees else 0
+        to_return = {
+            "nodes": nodes,
+            "edges": edges,
+            "communities": communities,
+            "average_degree": average_degree
+        }
+
+        save_pickle("network_statistics.pkl", to_return)
+
+    return jsonify(to_return)
+
+
 @app.route("/api/paper-analysis", methods=["POST"])
 def paper_analysis():
     """
@@ -565,30 +622,6 @@ def paper_analysis():
     try:
         # Read the uploaded file
         content = file.read().decode("utf-8")
-
-        # Import preprocessing function (assuming it exists)
-        from nltk.corpus import stopwords
-        from nltk.stem import WordNetLemmatizer
-        import nltk
-        import re
-
-        # Preprocess the uploaded document
-        def preprocess_text(text):
-            # Lowercase
-            text = text.lower()
-            # Remove special characters and digits
-            text = re.sub(r"[^a-zA-Z\s]", "", text)
-            # Tokenize
-            tokens = nltk.word_tokenize(text)
-            # Remove stopwords
-            stop_words = set(stopwords.words("english"))
-            tokens = [
-                word for word in tokens if word not in stop_words and len(word) > 3
-            ]
-            # Lemmatization
-            lemmatizer = WordNetLemmatizer()
-            tokens = [lemmatizer.lemmatize(word) for word in tokens]
-            return tokens
 
         processed_text = preprocess_text(content)
 
@@ -701,6 +734,66 @@ def paper_analysis():
         }
 
         return jsonify(analysis)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@app.route("/api/corpus-wordcloud")
+def corpus_wordcloud():
+    """
+    Generates a word cloud from the entire corpus.
+    Returns the PNG file. Caches the result to avoid recomputation.
+    """
+    wordcloud_path = "corpus_wordcloud.png"
+
+    # Check if cached file exists
+    if os.path.exists(wordcloud_path):
+        return send_file(wordcloud_path, mimetype='image/png')
+
+    try:
+        # Collect all words from all documents across all year groups
+        all_words = []
+        
+        for group_name, (model, num_topics, df) in all_topics.items():
+            if "processed_summary" in df.columns:
+                for _, row in df.iterrows():
+                    if row.get("processed_summary") and isinstance(row["processed_summary"], list):
+                        all_words.extend(row["processed_summary"])
+            elif "summary" in df.columns:
+                # Process summaries if not already processed
+                for _, row in df.iterrows():
+                    if row.get("summary"):
+                        processed = preprocess_text(row["summary"])
+                        all_words.extend(processed)
+        
+        if not all_words:
+            return jsonify({"error": "No words found in corpus"}), HTTPStatus.BAD_REQUEST
+        
+        # Count word frequencies
+        word_freq = Counter(all_words)
+        
+        # Generate word cloud
+        wordcloud = WordCloud(
+            width=1600,
+            height=800,
+            background_color='white',
+            colormap='viridis',
+            relative_scaling=0.5,
+            min_font_size=10,
+            max_words=200,
+            prefer_horizontal=0.7
+        ).generate_from_frequencies(word_freq)
+        
+        # Save to file
+        plt.figure(figsize=(20, 10))
+        plt.imshow(wordcloud, interpolation='bilinear')
+        plt.axis('off')
+        plt.tight_layout(pad=0)
+        plt.savefig(wordcloud_path, dpi=150, bbox_inches='tight', facecolor='white')
+        plt.close()
+        
+        return send_file(wordcloud_path, mimetype='image/png')
 
     except Exception as e:
         return jsonify({"error": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
