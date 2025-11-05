@@ -2,15 +2,6 @@
 
 import { Share } from "lucide-react";
 import { Textarea } from "../ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 import { Button } from "../ui/button";
 import {
   Form,
@@ -21,17 +12,21 @@ import {
 } from "../ui/form";
 import { useForm } from "react-hook-form";
 import { useRef, useState } from "react";
+import { submitPaperAnalysis } from "@/actions/paperAnalysis";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   UploadFormSchema,
   UploadFormSchemaType,
 } from "@/schemas/UploadFormSchema";
 
-const UploadForm = () => {
+type UploadFormProps = {
+  onAnalysis?: (res: any) => void;
+};
+
+const UploadForm = ({ onAnalysis }: UploadFormProps) => {
   const form = useForm<UploadFormSchemaType>({
     defaultValues: {
       rawSummary: "",
-      corpus: "",
     },
     resolver: zodResolver(UploadFormSchema),
   });
@@ -43,6 +38,9 @@ const UploadForm = () => {
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedFile(null);
+    form.setValue("file", undefined);
+
     const file = event.target.files?.[0];
 
     if (file) {
@@ -53,8 +51,28 @@ const UploadForm = () => {
   };
 
   const onSubmit = (data: UploadFormSchemaType) => {
-    console.log(data);
+    (async () => {
+      setError(null);
+      setLoading(true);
+
+      try {
+        const result = await submitPaperAnalysis({
+          file: selectedFile,
+          rawSummary: data.rawSummary,
+        });
+
+        // propagate result to parent if provided
+        onAnalysis?.(result);
+      } catch (err: any) {
+        setError(err?.message || String(err));
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <article className="space-y-4 bg-card p-4 rounded-lg">
@@ -101,36 +119,14 @@ const UploadForm = () => {
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="corpus"
-            render={({ field }) => (
-              <FormItem>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select corpus" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Corpus</SelectLabel>
-                      <SelectItem value="arxiv">arXiv</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button type="submit" className="w-full">
-            Analyze Paper
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Analyzing…" : "Analyze Paper"}
           </Button>
         </form>
       </Form>
+      {error && (
+        <div className="mt-2 text-destructive text-sm">Error: {error}</div>
+      )}
     </article>
   );
 };

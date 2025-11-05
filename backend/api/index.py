@@ -620,8 +620,100 @@ def paper_analysis():
         return jsonify({"error": "No selected file"}), HTTPStatus.BAD_REQUEST
 
     try:
-        # Read the uploaded file
-        content = file.read().decode("utf-8")
+        # Read the uploaded file (handle binary PDFs and text with unknown encoding)
+        bytes_data = file.read()
+        content = ""
+
+        # Prefer treating PDFs with a PDF parser; otherwise try UTF-8 then fall back
+        try:
+            if bytes_data[:4] == b"%PDF":
+                # PDF file — try to extract text using PyPDF2 if available
+                from io import BytesIO
+
+                try:
+                    from PyPDF2 import PdfReader
+                except Exception:
+                    PdfReader = None
+
+                if PdfReader is not None:
+                    reader = PdfReader(BytesIO(bytes_data))
+                    pages = []
+                    for p in reader.pages:
+                        try:
+                            pages.append(p.extract_text() or "")
+                        except Exception:
+                            pages.append("")
+                    content = "\n".join(pages)
+                else:
+                    # PyPDF2 not installed — fall back to a tolerant text decode
+                    content = bytes_data.decode("latin-1", errors="replace")
+            else:
+                # Try decode as UTF-8, then fallback to latin-1 with replacement
+                try:
+                    content = bytes_data.decode("utf-8")
+                except UnicodeDecodeError:
+                    content = bytes_data.decode("latin-1", errors="replace")
+        except Exception:
+            # Let outer exception handler catch and report
+            raise
+
+        # Import preprocessing function (assuming it exists)
+        from nltk.corpus import stopwords
+        from nltk.stem import WordNetLemmatizer
+        import nltk
+        import re
+
+        # Preprocess the uploaded document
+        def preprocess_text(text):
+            # Lowercase
+            text = text.lower()
+            # Remove special characters and digits (replace with space to keep token boundaries)
+            text = re.sub(r"[^a-zA-Z\s]", " ", text)
+
+            # Tokenize — prefer NLTK, but fall back to a simple regex tokenizer if NLTK data is missing
+            try:
+                tokens = nltk.word_tokenize(text)
+            except LookupError:
+                # nltk punkt tokenizer missing (e.g. 'punkt_tab' or 'punkt') — fallback
+                tokens = re.findall(r"\b[a-zA-Z]{2,}\b", text)
+
+            # Remove stopwords — fall back to a small built-in set if resource missing
+            try:
+                stop_words = set(stopwords.words("english"))
+            except LookupError:
+                stop_words = {
+                    "the",
+                    "and",
+                    "that",
+                    "this",
+                    "for",
+                    "with",
+                    "from",
+                    "have",
+                    "were",
+                    "which",
+                    "would",
+                    "there",
+                    "their",
+                    "about",
+                    "into",
+                    "until",
+                    "than",
+                    "also",
+                    "been",
+                }
+
+            tokens = [word for word in tokens if word not in stop_words and len(word) > 3]
+
+            # Lemmatization (best-effort)
+            try:
+                lemmatizer = WordNetLemmatizer()
+                tokens = [lemmatizer.lemmatize(word) for word in tokens]
+            except Exception:
+                # If lemmatizer or wordnet data missing, just continue with tokens
+                pass
+
+            return tokens
 
         processed_text = preprocess_text(content)
 
