@@ -16,25 +16,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { TrendingTopic } from "@/types";
 
-// Sample data structure for trending topics per year, palitan ng actual data from backend
-const data = [
-  { year: "2025", topic: "A", value: 85, color: "var(--chart-5)" },
-  { year: "2025", topic: "B", value: 95, color: "var(--chart-4)" },
-  { year: "2025", topic: "C", value: 65, color: "var(--chart-3)" },
-  // 2024
-  { year: "2024", topic: "A", value: 80, color: "var(--chart-5)" },
-  { year: "2024", topic: "D", value: 90, color: "var(--chart-4)" },
-  { year: "2024", topic: "E", value: 50, color: "var(--chart-3)" },
-  // 2023
-  { year: "2023", topic: "A", value: 60, color: "var(--chart-5)" },
-  { year: "2023", topic: "C", value: 62, color: "var(--chart-4)" },
-  { year: "2023", topic: "F", value: 30, color: "var(--chart-3)" },
-  // 2022
-  { year: "2022", topic: "B", value: 55, color: "var(--chart-5)" },
-  { year: "2022", topic: "D", value: 70, color: "var(--chart-4)" },
-  { year: "2022", topic: "G", value: 45, color: "var(--chart-3)" },
-];
+// Build chart data from the `trendingTopics` prop.
+// Each TrendingTopic.group is treated as the year. For each year we take
+// the top 3 topics by `document_count` and use the first keyword as the label.
+// Colors are assigned in the same order used previously.
 
 const CustomLabel = (props: any) => {
   const { x, y, width, height } = props;
@@ -56,8 +43,52 @@ const CustomLabel = (props: any) => {
   );
 };
 
-const TrendingTopicsPerYear = () => {
-  const years = ["2025", "2024", "2023", "2022"];
+type TrendingTopicsPerYearProps = {
+  trendingTopics: TrendingTopic[];
+};
+
+const TrendingTopicsPerYear = ({
+  trendingTopics = [],
+}: TrendingTopicsPerYearProps) => {
+  // derive years from incoming data; fall back to sample years if empty
+  const years: string[] =
+    trendingTopics.length > 0
+      ? trendingTopics
+          .map((t) => t.group)
+          // try numeric descending if possible
+          .sort((a, b) => Number(b) - Number(a))
+      : ["2025", "2024", "2023", "2022"];
+
+  const colors = [
+    "var(--chart-5)",
+    "var(--chart-4)",
+    "var(--chart-3)",
+    "var(--chart-2)",
+    "var(--chart-1)",
+  ];
+
+  type ChartEntry = {
+    year: string;
+    topic: string;
+    value: number;
+    color: string;
+  };
+
+  const data: ChartEntry[] = trendingTopics.flatMap((group) => {
+    const year = group.group;
+    const topTopics = [...group.topics]
+      .sort((a, b) => b.document_count - a.document_count)
+      .slice(0, 3);
+
+    return topTopics.map((topic, idx) => ({
+      year,
+      topic: topic.keywords?.[0]?.word ?? `Topic ${topic.topic_id}`,
+      value: topic.document_count,
+      color: colors[idx % colors.length],
+    }));
+  });
+
+  console.log({ trendingTopics });
 
   return (
     <article className="flex flex-col space-y-4 bg-card p-4 rounded-lg h-full">
