@@ -1,15 +1,6 @@
 "use client";
 
 import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  SortingState,
-} from "@tanstack/react-table";
-import { useState } from "react";
-import {
   Table,
   TableBody,
   TableCell,
@@ -18,6 +9,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { SimilarDocument } from "@/types";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useMemo, useState } from "react";
 
 type DocumentData = {
   document: string;
@@ -29,31 +29,38 @@ type Props = {
 };
 
 const SimilarDocuments = ({ data }: Props) => {
-  const rows: DocumentData[] = (data || []).map((d) => ({
-    document: d.title,
-    author: (d.authors || []).join(", "),
-  }));
+  const rows: DocumentData[] = useMemo(
+    () =>
+      (data || []).map((d) => ({
+        document: d.title,
+        author: (d.authors || []).join(", "),
+      })),
+    [data]
+  );
 
-  const columns: ColumnDef<DocumentData>[] = [
-    {
-      accessorKey: "document",
-      header: "Document",
-      cell: ({ row }) => (
-        <div className="min-w-[300px] break-words whitespace-normal">
-          {row.getValue("document")}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "author",
-      header: "Author",
-      cell: ({ row }) => (
-        <div className="min-w-[200px] break-words whitespace-normal">
-          {row.getValue("author")}
-        </div>
-      ),
-    },
-  ];
+  const columns: ColumnDef<DocumentData>[] = useMemo(
+    () => [
+      {
+        accessorKey: "document",
+        header: "Document",
+        cell: ({ row }) => (
+          <div className="min-w-[300px] break-words whitespace-normal">
+            {row.getValue("document")}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "author",
+        header: "Author",
+        cell: ({ row }) => (
+          <div className="min-w-[200px] break-words whitespace-normal">
+            {row.getValue("author")}
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
   const [sorting, setSorting] = useState<SortingState>([]);
 

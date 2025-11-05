@@ -1,16 +1,6 @@
 "use client";
 
 import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  SortingState,
-} from "@tanstack/react-table";
-import { useState } from "react";
-import type { TopicSimilarityItem } from "@/types";
-import {
   Table,
   TableBody,
   TableCell,
@@ -18,6 +8,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { TopicSimilarityItem } from "@/types";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import { useMemo, useState } from "react";
 
 type TopicRow = {
   topic: string;
@@ -29,30 +29,37 @@ type TopicSimilarityProps = {
 };
 
 const TopicSimilarity = ({ topics = [] }: TopicSimilarityProps) => {
-  const data: TopicRow[] = topics.map((t) => ({
-    topic: t.label,
-    coherenceScore: t.probability,
-  }));
+  const data: TopicRow[] = useMemo(
+    () =>
+      topics.map((t) => ({
+        topic: t.label,
+        coherenceScore: t.probability,
+      })),
+    [topics]
+  );
 
-  const columns: ColumnDef<TopicRow>[] = [
-    {
-      accessorKey: "topic",
-      header: "Topic",
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("topic")}</div>
-      ),
-    },
-    {
-      accessorKey: "coherenceScore",
-      header: () => <div className="text-right">Coherence Score</div>,
-      cell: ({ row }) => (
-        <div className="text-right">
-          {(row.getValue<number>("coherenceScore") * 100).toFixed(2)}%
-        </div>
-      ),
-      enableSorting: true,
-    },
-  ];
+  const columns: ColumnDef<TopicRow>[] = useMemo(
+    () => [
+      {
+        accessorKey: "topic",
+        header: "Topic",
+        cell: ({ row }) => (
+          <div className="font-medium">{row.getValue("topic")}</div>
+        ),
+      },
+      {
+        accessorKey: "coherenceScore",
+        header: () => <div className="text-right">Coherence Score</div>,
+        cell: ({ row }) => (
+          <div className="text-right">
+            {(row.getValue<number>("coherenceScore") * 100).toFixed(2)}%
+          </div>
+        ),
+        enableSorting: true,
+      },
+    ],
+    []
+  );
 
   const [sorting, setSorting] = useState<SortingState>([]);
 
