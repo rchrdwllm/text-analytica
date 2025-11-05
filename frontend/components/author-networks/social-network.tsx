@@ -9,6 +9,9 @@ import {
   BackendLink,
 } from "@/lib/author-network";
 import { Spinner } from "@/components/ui/spinner";
+import { Button } from "../ui/button";
+import { RotateCw } from "lucide-react";
+import { Input } from "../ui/input";
 
 interface Node extends d3.SimulationNodeDatum {
   id: string;
@@ -320,26 +323,27 @@ const SocialNetwork = () => {
           Node size represents number of papers
         </p>
         <div className="flex gap-2 mt-2">
-          <input
-            className="input input-sm"
+          <Input
             placeholder="Author name (exact)"
             value={authorQuery}
             onChange={(e) => setAuthorQuery(e.target.value)}
           />
-          <button
-            className="btn btn-sm"
+          <Button
+            variant="secondary"
             onClick={() => loadGraphForAuthor(authorQuery)}
             disabled={loadingNetwork}
           >
-            {loadingNetwork ? "Loading..." : "Load"}
-          </button>
-          <button
-            className="btn btn-sm"
-            onClick={() => loadFullGraph()}
-            disabled={loadingNetwork}
-          >
-            Refresh Full Graph
-          </button>
+            {loadingNetwork ? (
+              "Loading..."
+            ) : (
+              <>
+                <RotateCw /> Load graph for author
+              </>
+            )}
+          </Button>
+          <Button onClick={() => loadFullGraph()} disabled={loadingNetwork}>
+            <RotateCw /> Refresh full graph
+          </Button>
           {networkError && (
             <div className="ml-2 text-red-500 text-xs">{networkError}</div>
           )}
