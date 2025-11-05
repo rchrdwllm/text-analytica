@@ -284,61 +284,64 @@ def trending_topics_per_group():
     Returns the trending topics per year with top keywords.
     Vectorized version for better performance.
     """
-    result = []
-    for group_name, (model, num_topics, df) in all_topics.items():
-        # Get all topics for this year group
-        topics_data = []
 
-        # Vectorized computation: process all documents at once
-        if "processed_summary" in df.columns:
-            # Get dominant topics for all documents at once
-            def get_dominant_topic(summary):
-                if not summary:
+    if (result := load_pickle("trending_topics_per_group.pkl")) is None:
+        result = []
+        for group_name, (model, num_topics, df) in all_topics.items():
+            # Get all topics for this year group
+            topics_data = []
+
+            # Vectorized computation: process all documents at once
+            if "processed_summary" in df.columns:
+                # Get dominant topics for all documents at once
+                def get_dominant_topic(summary):
+                    if not summary:
+                        return -1
+                    bow = model.id2word.doc2bow(summary)
+                    if not bow:
+                        return -1
+                    doc_topics = model.get_document_topics(bow)
+                    if doc_topics:
+                        return max(doc_topics, key=lambda x: x[1])[0]
                     return -1
-                bow = model.id2word.doc2bow(summary)
-                if not bow:
-                    return -1
-                doc_topics = model.get_document_topics(bow)
-                if doc_topics:
-                    return max(doc_topics, key=lambda x: x[1])[0]
-                return -1
-            
-            # Vectorized operation using pandas apply
-            valid_summaries = df['processed_summary'].notna()
-            dominant_topics = df[valid_summaries]['processed_summary'].apply(get_dominant_topic)
-            
-            # Count documents per topic using value_counts
-            topic_counts = dominant_topics[dominant_topics >= 0].value_counts().to_dict()
-        else:
-            topic_counts = {}
 
-        for topic_id in range(num_topics):
-            # Get top 10 words for this topic
-            top_words = model.show_topic(topic_id, topn=10)
-            keywords = [
-                {"word": word, "weight": float(weight)} for word, weight in top_words
-            ]
+                # Vectorized operation using pandas apply
+                valid_summaries = df['processed_summary'].notna()
+                dominant_topics = df[valid_summaries]['processed_summary'].apply(get_dominant_topic)
 
-            # Get document count from precomputed counts
-            topic_count = topic_counts.get(topic_id, 0)
+                # Count documents per topic using value_counts
+                topic_counts = dominant_topics[dominant_topics >= 0].value_counts().to_dict()
+            else:
+                topic_counts = {}
 
-            topics_data.append(
+            for topic_id in range(num_topics):
+                # Get top 10 words for this topic
+                top_words = model.show_topic(topic_id, topn=10)
+                keywords = [
+                    {"word": word, "weight": float(weight)} for word, weight in top_words
+                ]
+
+                # Get document count from precomputed counts
+                topic_count = topic_counts.get(topic_id, 0)
+
+                topics_data.append(
+                    {
+                        "topic_id": topic_id,
+                        "keywords": keywords,
+                        "document_count": topic_count,
+                    }
+                )
+
+            # Sort by document count to get "trending" topics
+            topics_data.sort(key=lambda x: x["document_count"], reverse=True)
+
+            result.append(
                 {
-                    "topic_id": topic_id,
-                    "keywords": keywords,
-                    "document_count": topic_count,
+                    "group": group_name,
+                    "topics": topics_data[:5],  # Return top 5 trending topics
                 }
             )
-
-        # Sort by document count to get "trending" topics
-        topics_data.sort(key=lambda x: x["document_count"], reverse=True)
-
-        result.append(
-            {
-                "group": group_name,
-                "topics": topics_data[:5],  # Return top 5 trending topics
-            }
-        )
+        save_pickle("trending_topics_per_group.pkl", result)
 
     return jsonify(result)
 
