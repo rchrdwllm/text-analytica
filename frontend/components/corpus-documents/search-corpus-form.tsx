@@ -1,11 +1,13 @@
 "use client";
 
+import { CorpusSearchContext } from "@/app/corpus-documents/page";
 import {
   SearchCorpusSchema,
   SearchCorpusSchemaType,
 } from "@/schemas/SearchCorpusSchema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Search } from "lucide-react";
+import { useContext } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "../ui/button";
 import {
@@ -22,6 +24,7 @@ import {
 } from "../ui/input-group";
 
 const SearchCorpusForm = () => {
+  const { setSearchQuery } = useContext(CorpusSearchContext);
   const form = useForm<SearchCorpusSchemaType>({
     defaultValues: {
       query: "",
@@ -29,9 +32,13 @@ const SearchCorpusForm = () => {
     resolver: zodResolver(SearchCorpusSchema),
   });
 
+  const onSubmit = (data: SearchCorpusSchemaType) => {
+    setSearchQuery(data.query || "");
+  };
+
   return (
     <Form {...form}>
-      <form className="flex items-center gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-4">
         <FormField
           control={form.control}
           name="query"

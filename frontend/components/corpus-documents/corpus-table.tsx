@@ -1,5 +1,6 @@
 "use client";
 
+import { CorpusSearchContext } from "@/app/corpus-documents/page";
 import {
   Table,
   TableBody,
@@ -8,6 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Document } from "@/lib/documents";
+import { callApi } from "@/lib/utils";
 import {
   ColumnDef,
   flexRender,
@@ -16,9 +19,8 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Button } from "../ui/button";
-import { Document } from "@/lib/documents";
 
 type CorpusTableProps = {
   initialFullData?: Document[];
@@ -55,16 +57,58 @@ const columns: ColumnDef<Document>[] = [
 const CorpusTable = ({
   initialFullData = [],
   initialRenderedCount = 20,
-}: CorpusTableProps) => {
-  const [renderedCount, setRenderedCount] = useState(initialRenderedCount);
+}) => {
+  const { searchQuery } = useContext(CorpusSearchContext);
+  const [renderedCount, setRenderedCount] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [data, setData] = useState([] as Document[]);
-  const [fullData, setFullData] = useState(initialFullData as Document[]);
+  const [fullData, setFullData] = useState([] as Document[]);
+  const [filteredData, setFilteredData] = useState([] as Document[]);
 
-  // keep local paging reactive to changes to fullData or renderedCount
   useEffect(() => {
-    setData(fullData.slice(0, renderedCount));
-  }, [renderedCount, fullData]);
+    let cancelled = false;
+    (async () => {
+      const result = await callApi("/api/corpus-documents");
+      if (cancelled || result.success == null) return;
+
+      const data = result.success as Document[];
+      for (const row of data) {
+        /// sybau
+        row["authors"] = (row["authors"] as unknown as string[]).join(", ");
+      }
+
+      data.sort((a: Document, b: Document) => b.publicationYear - a.publicationYear);
+      setRenderedCount(20);
+      setFullData(data);
+    })();
+
+    return () => {cancelled = true};
+  }, []);
+
+  // Filter data based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredData(fullData);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = fullData.filter((doc) => {
+      return (
+        doc.title?.toLowerCase().includes(query) ||
+        doc.authors?.toLowerCase().includes(query) ||
+        doc.topics?.toLowerCase().includes(query) ||
+        doc.publicationYear?.toString().includes(query)
+      );
+    });
+
+    setFilteredData(filtered);
+    setRenderedCount(20); // Reset to first 20 rows when filtering
+  }, [searchQuery, fullData]);
+
+  useEffect(() => {
+    setData(filteredData.slice(0, renderedCount));
+  }, [renderedCount, filteredData]);
 
   const table = useReactTable({
     data,
@@ -126,16 +170,11 @@ const CorpusTable = ({
             )}
           </TableBody>
         </Table>
-        <Button
-          type="submit"
-          className="ml-auto"
-          onClick={(e) => {
-            e.preventDefault();
-            setRenderedCount((v) => v + 20);
-          }}
-        >
-          Load more rows (+20 )
-        </Button>
+        {renderedCount < filteredData.length && (
+          <Button type="submit" className="ml-auto" onClick={(e) => {e.preventDefault(); setRenderedCount((v) => Math.min(v + 20, filteredData.length))}}>
+            Load more rows (+{Math.min(20, filteredData.length - renderedCount)})
+          </Button>
+        )}
       </div>
     </article>
   );

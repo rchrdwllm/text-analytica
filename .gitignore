@@ -1,1 +1,3 @@
 lda/lda_models
+lda/old_lda_models
+*.pkl
