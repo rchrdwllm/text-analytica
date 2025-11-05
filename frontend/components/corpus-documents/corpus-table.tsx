@@ -31,14 +31,18 @@ const columns: ColumnDef<Document>[] = [
     accessorKey: "title",
     header: "Title",
     cell: ({ row }) => (
-      <div className="max-w-md truncate">{row.getValue("title")}</div>
+      <div className="min-w-[300px] break-words whitespace-normal">
+        {row.getValue("title")}
+      </div>
     ),
   },
   {
     accessorKey: "authors",
     header: "Authors",
     cell: ({ row }) => (
-      <div className="max-w-md truncate">{row.getValue("authors")}</div>
+      <div className="min-w-[250px] break-words whitespace-normal">
+        {row.getValue("authors")}
+      </div>
     ),
   },
   {
@@ -49,7 +53,11 @@ const columns: ColumnDef<Document>[] = [
   {
     accessorKey: "topics",
     header: "Topics",
-    cell: ({ row }) => <div className="min-w-64">{row.getValue("topics")}</div>,
+    cell: ({ row }) => (
+      <div className="min-w-[200px] break-words whitespace-normal">
+        {row.getValue("topics")}
+      </div>
+    ),
   },
 ];
 
