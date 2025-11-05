@@ -40,6 +40,7 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
   const rawSummary = form.watch("rawSummary");
 
   useEffect(() => {
+    // Re-enable form and clear results when both inputs are empty
     if (!rawSummary && !selectedFile) {
       setDisabled(false);
       onAnalysis?.(null);
