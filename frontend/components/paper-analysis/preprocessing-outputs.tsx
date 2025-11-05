@@ -1,9 +1,3 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import type { PreprocessingOutputs as PreprocType } from "@/types";
 
 type Props = {
@@ -26,37 +20,25 @@ const PreprocessingOutputs = ({ data }: Props) => {
             <strong>Unique words:</strong> {data.unique_words}
           </div>
           <div>
-            <strong>Sample words:</strong>{" "}
+            <strong>Sample pre-processed words:</strong>{" "}
             {data.sample_words?.slice(0, 20).join(", ")}
           </div>
         </div>
       ) : (
-        <Accordion type="single" collapsible>
-          <AccordionItem value="processed_summary">
-            <AccordionTrigger className="cursor-pointer">
-              Processed Summary
-            </AccordionTrigger>
-            <AccordionContent>Processed Summary</AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="text_cleaning">
-            <AccordionTrigger className="cursor-pointer">
-              Text Cleaning
-            </AccordionTrigger>
-            <AccordionContent>Text Cleaning</AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="text_lemmatization">
-            <AccordionTrigger className="cursor-pointer">
-              Text Lemmatization
-            </AccordionTrigger>
-            <AccordionContent>Text Lemmatization</AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="text_pos_tagging">
-            <AccordionTrigger className="cursor-pointer">
-              Text POS Tagging
-            </AccordionTrigger>
-            <AccordionContent>Text POS Tagging</AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        <div className="space-y-2 text-sm">
+          <div>
+            <strong>Filename:</strong>
+          </div>
+          <div>
+            <strong>Word count:</strong>
+          </div>
+          <div>
+            <strong>Unique words:</strong>
+          </div>
+          <div>
+            <strong>Sample pre-processed words:</strong>
+          </div>
+        </div>
       )}
     </article>
   );
