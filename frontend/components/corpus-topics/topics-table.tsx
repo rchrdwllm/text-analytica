@@ -14,12 +14,12 @@ import { Fragment, useEffect, useState } from "react";
 
 type TopicDocument = {
   title: string;
+  confidence: number;
 };
 
 type TopicData = {
   topic: string;
   documents: TopicDocument[];
-  coherence: number;
 };
 
 const TopicsTable = () => {
@@ -70,7 +70,7 @@ const TopicsTable = () => {
         </div>
       ) : loading ? (
         <div className="py-8 text-muted-foreground text-center">
-          Loading topics...
+          Loading topics... (This may take a while)
         </div>
       ) : error ? (
         <div className="py-8 text-destructive text-center">{error}</div>
@@ -85,9 +85,7 @@ const TopicsTable = () => {
               <TableRow>
                 <TableHead className="min-w-[200px]">Topic</TableHead>
                 <TableHead className="min-w-[300px]">Document</TableHead>
-                <TableHead className="min-w-[150px] text-right">
-                  Coherence Score
-                </TableHead>
+                <TableHead className="min-w-[150px] text-right">Confidence</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -106,14 +104,9 @@ const TopicsTable = () => {
                       <TableCell className="break-words whitespace-normal">
                         {doc.title}
                       </TableCell>
-                      {docIndex === 0 ? (
-                        <TableCell
-                          rowSpan={topicData.documents.length}
-                          className="min-w-[150px] text-right break-words align-top whitespace-normal"
-                        >
-                          {(topicData.coherence * 100).toFixed(2)}%
-                        </TableCell>
-                      ) : null}
+                      <TableCell className="text-right">
+                        {(doc.confidence * 100).toFixed(2)}%
+                      </TableCell>
                     </TableRow>
                   ))}
                 </Fragment>

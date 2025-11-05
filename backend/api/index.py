@@ -21,10 +21,8 @@ from wordcloud import WordCloud
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
-from collections import Counter
 
 import re
-from scipy.spatial.distance import cosine
 
 app = Flask(__name__)
 CORS(app)
@@ -35,16 +33,17 @@ all_authors: nx.MultiGraph = None
 all_topics: dict[str, tuple[LdaMulticore, int, pd.DataFrame]] = {}
 
 def save_pickle(path: str, object: Any):
-    path_obj = Path(path)
-    if not os.path.exists(path_obj.parent):
+    path_obj = Path("pickles") / path
+    if not path_obj.parent.exists():
         os.makedirs(path_obj.parent)
 
     with open(path_obj, "wb") as f:
         pickle.dump(object, f)
 
 def load_pickle(path: str) -> Any | None:
-    if os.path.exists(path):
-        with open(path, "rb") as f:
+    path_obj = Path("pickles") / path
+    if path_obj.exists():
+        with open(path_obj, "rb") as f:
             return pickle.load(f)
     return None
 
@@ -153,19 +152,13 @@ def load_dataset():
 
 def load_author_graph():
     global all_authors
-    try:
-        if os.path.exists("graph.pkl"):
-            with open("graph.pkl", "rb") as f:
-                all_authors = pickle.load(f)
-                return
-        raise Exception()
-    except:
+
+    if (all_authors := load_pickle("graph.pkl")) is None:
         # Initialize an empty graph
         G = nx.Graph()
 
         # Iterate through each row of the DataFrame
-        for index, row in dataset_df.iterrows():
-            print(f"{index}/{len(dataset_df)}")
+        for _, row in dataset_df.iterrows():
             authors = parse_authors_field(row.get("authors"))
 
             # Add nodes for each author
@@ -185,9 +178,9 @@ def load_author_graph():
                             G.add_edge(author1, author2, weight=1)
 
         all_authors = G
-        model_path = f"graph.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(all_authors, f)
+        save_pickle("graph.pkl", all_authors)
+
+    return all_authors
 
 
 def load_topics():
@@ -358,61 +351,64 @@ def corpus_topics_detail(year_group):
     Returns detailed topics with documents and coherence scores for a specific year group.
     Schema: [{"topic": string, "documents": [{"title": string}], "coherence": number}]
     """
-    print(f"Fetching topics for year group: {year_group}")
 
     # Find the model and data for the specified year group
     if year_group not in all_topics:
         return jsonify({"error": f"Year group '{year_group}' not found"}), HTTPStatus.NOT_FOUND
 
-    model, num_topics, df = all_topics[year_group]
+    if (to_return := load_pickle(f"corpus_topics/{year_group}.pkl")) is None:
+        model, num_topics, df = all_topics[year_group]
+        to_return = []
+        # Vectorized computation: process all documents at once to find dominant topics
+        if "processed_summary" in df.columns:
+            # Get dominant topic and confidence for all documents
+            def get_dominant_topic_with_confidence(summary):
+                if not summary:
+                    return -1, 0.0
+                bow = model.id2word.doc2bow(summary)
+                if not bow:
+                    return -1, 0.0
+                doc_topics = model.get_document_topics(bow)
+                if doc_topics:
+                    # Get the topic with highest probability
+                    dominant = max(doc_topics, key=lambda x: x[1])
+                    return dominant[0], dominant[1]  # topic_id, confidence
+                return -1, 0.0
 
-    result = []
+            valid_summaries = df['processed_summary'].notna()
+            df_copy = df[valid_summaries].copy()
 
-    # Vectorized computation: process all documents at once to find dominant topics
-    if "processed_summary" in df.columns:
-        # Get dominant topics for all documents
-        def get_dominant_topic(summary):
-            if not summary:
-                return -1
-            bow = model.id2word.doc2bow(summary)
-            if not bow:
-                return -1
-            doc_topics = model.get_document_topics(bow)
-            if doc_topics:
-                return max(doc_topics, key=lambda x: x[1])[0]
-            return -1
+            # Apply function to get both topic and confidence
+            topic_confidence = df_copy['processed_summary'].apply(get_dominant_topic_with_confidence)
+            df_copy['dominant_topic'] = topic_confidence.apply(lambda x: x[0])
+            df_copy['topic_confidence'] = topic_confidence.apply(lambda x: x[1])
 
-        valid_summaries = df['processed_summary'].notna()
-        df_copy = df[valid_summaries].copy()
-        df_copy['dominant_topic'] = df_copy['processed_summary'].apply(get_dominant_topic)
+            # Group documents by dominant topic
+            for topic_id in range(num_topics):
+                # Get top words for this topic to create the topic label
+                topic_words = model.show_topic(topic_id, topn=3)
+                topic_label = ", ".join([word for word, _ in topic_words])
 
-        # Group documents by dominant topic
-        for topic_id in range(num_topics):
-            # Get top words for this topic to create the topic label
-            topic_words = model.show_topic(topic_id, topn=5)
-            topic_label = ", ".join([word for word, _ in topic_words])
+                # Get documents where this is the dominant topic
+                topic_docs = df_copy[df_copy['dominant_topic'] == topic_id]
 
-            # Get documents where this is the dominant topic
-            topic_docs = df_copy[df_copy['dominant_topic'] == topic_id]
+                # Sort by confidence score and limit to top 10 documents
+                topic_docs = topic_docs.sort_values('topic_confidence', ascending=False)
 
-            # Limit to top 10 documents for this topic
-            documents = []
-            for _, row in topic_docs.head(5).iterrows():
-                documents.append({
-                    "title": row.get("title", "Unknown")
+                documents = []
+                for _, row in topic_docs.head(10).iterrows():
+                    documents.append({
+                        "title": row.get("title", "Unknown"),
+                        "confidence": float(row['topic_confidence'])
+                    })
+
+                to_return.append({
+                    "topic": topic_label,
+                    "documents": documents
                 })
+        save_pickle(f"corpus_topics/{year_group}.pkl", to_return)
 
-            # Calculate topic coherence (using a simple approximation based on topic probability)
-            # For LDA models, we can use the average probability of top words as a coherence proxy
-            coherence_score = sum([weight for _, weight in topic_words]) / len(topic_words)
-
-            result.append({
-                "topic": topic_label,
-                "documents": documents,
-                "coherence": float(coherence_score)
-            })
-
-    return jsonify(result)
+    return jsonify(to_return)
 
 
 @app.route("/api/author-networks", methods=["POST"])
@@ -661,64 +657,6 @@ def paper_analysis():
             # Let outer exception handler catch and report
             raise
 
-        # Import preprocessing function (assuming it exists)
-        from nltk.corpus import stopwords
-        from nltk.stem import WordNetLemmatizer
-        import nltk
-        import re
-
-        # Preprocess the uploaded document
-        def preprocess_text(text):
-            # Lowercase
-            text = text.lower()
-            # Remove special characters and digits (replace with space to keep token boundaries)
-            text = re.sub(r"[^a-zA-Z\s]", " ", text)
-
-            # Tokenize — prefer NLTK, but fall back to a simple regex tokenizer if NLTK data is missing
-            try:
-                tokens = nltk.word_tokenize(text)
-            except LookupError:
-                # nltk punkt tokenizer missing (e.g. 'punkt_tab' or 'punkt') — fallback
-                tokens = re.findall(r"\b[a-zA-Z]{2,}\b", text)
-
-            # Remove stopwords — fall back to a small built-in set if resource missing
-            try:
-                stop_words = set(stopwords.words("english"))
-            except LookupError:
-                stop_words = {
-                    "the",
-                    "and",
-                    "that",
-                    "this",
-                    "for",
-                    "with",
-                    "from",
-                    "have",
-                    "were",
-                    "which",
-                    "would",
-                    "there",
-                    "their",
-                    "about",
-                    "into",
-                    "until",
-                    "than",
-                    "also",
-                    "been",
-                }
-
-            tokens = [word for word in tokens if word not in stop_words and len(word) > 3]
-
-            # Lemmatization (best-effort)
-            try:
-                lemmatizer = WordNetLemmatizer()
-                tokens = [lemmatizer.lemmatize(word) for word in tokens]
-            except Exception:
-                # If lemmatizer or wordnet data missing, just continue with tokens
-                pass
-
-            return tokens
-
         processed_text = preprocess_text(content)
 
         # Find topic similarities and similar documents across all year groups
@@ -839,7 +777,7 @@ def paper_analysis():
 def corpus_wordcloud(year_group):
     """
     Generates a word cloud from the entire corpus.
-    Returns the PNG file. Caches the result to avoid recomputation.
+    Returns the PNG file.
     """
 
     try:
