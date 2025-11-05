@@ -12,11 +12,10 @@ const DashboardPage = async () => {
 
   const error = docsError || overviewError;
 
-  if (error) return <ErrorAlert error={error} />;
-
   return (
     <main className="space-y-4 p-6 min-h-full">
       <h1 className="font-semibold text-2xl">Dashboard</h1>
+      {error && <ErrorAlert error={error} />}
       <CorpusOverview
         loadedDocuments={overview?.loadedDocuments}
         identifiedTopics={overview?.identifiedTopics}

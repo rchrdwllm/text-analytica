@@ -1,6 +1,5 @@
 "use client";
 
-import { CorpusSearchContext } from "@/app/corpus-documents/page";
 import {
   SearchCorpusSchema,
   SearchCorpusSchemaType,
@@ -22,6 +21,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "../ui/input-group";
+import { CorpusSearchContext } from "@/context/corpus-search-context-wrapper";
 
 const SearchCorpusForm = () => {
   const { setSearchQuery } = useContext(CorpusSearchContext);
@@ -38,7 +38,10 @@ const SearchCorpusForm = () => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex items-center gap-4">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="flex items-center gap-4"
+      >
         <FormField
           control={form.control}
           name="query"

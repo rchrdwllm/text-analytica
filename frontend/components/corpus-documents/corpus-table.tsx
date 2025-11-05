@@ -1,6 +1,5 @@
 "use client";
 
-import { CorpusSearchContext } from "@/app/corpus-documents/page";
 import {
   Table,
   TableBody,
@@ -21,6 +20,7 @@ import {
 } from "@tanstack/react-table";
 import { useContext, useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import { CorpusSearchContext } from "@/context/corpus-search-context-wrapper";
 
 type CorpusTableProps = {
   initialFullData?: Document[];
@@ -54,10 +54,7 @@ const columns: ColumnDef<Document>[] = [
   },
 ];
 
-const CorpusTable = ({
-  initialFullData = [],
-  initialRenderedCount = 20,
-}) => {
+const CorpusTable = ({ initialFullData = [], initialRenderedCount = 20 }) => {
   const { searchQuery } = useContext(CorpusSearchContext);
   const [renderedCount, setRenderedCount] = useState(0);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -77,12 +74,16 @@ const CorpusTable = ({
         row["authors"] = (row["authors"] as unknown as string[]).join(", ");
       }
 
-      data.sort((a: Document, b: Document) => b.publicationYear - a.publicationYear);
+      data.sort(
+        (a: Document, b: Document) => b.publicationYear - a.publicationYear
+      );
       setRenderedCount(20);
       setFullData(data);
     })();
 
-    return () => {cancelled = true};
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Filter data based on search query
@@ -171,8 +172,16 @@ const CorpusTable = ({
           </TableBody>
         </Table>
         {renderedCount < filteredData.length && (
-          <Button type="submit" className="ml-auto" onClick={(e) => {e.preventDefault(); setRenderedCount((v) => Math.min(v + 20, filteredData.length))}}>
-            Load more rows (+{Math.min(20, filteredData.length - renderedCount)})
+          <Button
+            type="submit"
+            className="ml-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              setRenderedCount((v) => Math.min(v + 20, filteredData.length));
+            }}
+          >
+            Load more rows (+{Math.min(20, filteredData.length - renderedCount)}
+            )
           </Button>
         )}
       </div>
