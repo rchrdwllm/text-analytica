@@ -79,7 +79,7 @@ const CorpusTable = ({
 
   return (
     <article className="flex-1 bg-card p-4 rounded-lg">
-      <div className="rounded-md">
+      <div className="space-y-4 rounded-md">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
