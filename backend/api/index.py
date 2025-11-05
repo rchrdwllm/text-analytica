@@ -597,6 +597,8 @@ def author_networks_get():
 
     # limit nodes to first 1000 and links to first 2000 to keep payload reasonable
     node_list = list(all_authors.nodes())[:1000]
+    node_set = set(node_list)  # Create a set for O(1) lookup
+    
     for n in node_list:
         nodes.append({
             "id": n, 
@@ -605,8 +607,12 @@ def author_networks_get():
             "paper_count": author_paper_counts.get(n, 0)
         })
 
-    for u, v, data in list(all_authors.edges(data=True))[:2000]:
-        links.append({"source": u, "target": v, "value": data.get("weight", 1)})
+    # Only include edges where BOTH nodes are in our selected node set
+    for u, v, data in all_authors.edges(data=True):
+        if u in node_set and v in node_set:
+            links.append({"source": u, "target": v, "value": data.get("weight", 1)})
+            if len(links) >= 2000:  # Still limit total links
+                break
 
     return jsonify({"nodes": nodes, "links": links, "statistics": {"nodes": len(nodes), "links": len(links)}})
 
