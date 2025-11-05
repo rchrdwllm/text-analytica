@@ -8,7 +8,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { callApi } from "@/lib/health";
 import {
   ColumnDef,
   flexRender,
@@ -19,12 +18,11 @@ import {
 } from "@tanstack/react-table";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import { Document } from "@/lib/documents";
 
-type Document = {
-  title: string;
-  authors: string;
-  publicationYear: number;
-  topics: string;
+type CorpusTableProps = {
+  initialFullData?: Document[];
+  initialRenderedCount?: number;
 };
 
 const columns: ColumnDef<Document>[] = [
@@ -38,7 +36,9 @@ const columns: ColumnDef<Document>[] = [
   {
     accessorKey: "authors",
     header: "Authors",
-    cell: ({ row }) => <div className="max-w-md truncate">{row.getValue("authors")}</div>,
+    cell: ({ row }) => (
+      <div className="max-w-md truncate">{row.getValue("authors")}</div>
+    ),
   },
   {
     accessorKey: "publicationYear",
@@ -52,31 +52,19 @@ const columns: ColumnDef<Document>[] = [
   },
 ];
 
-const CorpusTable = () => {
-  const [renderedCount, setRenderedCount] = useState(0);
+const CorpusTable = ({
+  initialFullData = [],
+  initialRenderedCount = 20,
+}: CorpusTableProps) => {
+  const [renderedCount, setRenderedCount] = useState(initialRenderedCount);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [data, setData] = useState([] as Document[]);
-  const [fullData, setFullData] = useState([] as Document[]);
+  const [fullData, setFullData] = useState(initialFullData as Document[]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const result = await callApi("/api/corpus-documents");
-      if (cancelled) return;
-
-      for (const row of result) {
-        row["authors"] = row["authors"].join(", ");
-      }
-      setRenderedCount(20);
-      setFullData(result);
-    })();
-
-    return () => {cancelled = true};
-  }, []);
-
+  // keep local paging reactive to changes to fullData or renderedCount
   useEffect(() => {
     setData(fullData.slice(0, renderedCount));
-  }, [renderedCount]);
+  }, [renderedCount, fullData]);
 
   const table = useReactTable({
     data,
@@ -138,7 +126,14 @@ const CorpusTable = () => {
             )}
           </TableBody>
         </Table>
-        <Button type="submit" className="ml-auto" onClick={(e) => {e.preventDefault(); setRenderedCount((v) => v + 20)}}>
+        <Button
+          type="submit"
+          className="ml-auto"
+          onClick={(e) => {
+            e.preventDefault();
+            setRenderedCount((v) => v + 20);
+          }}
+        >
           Load more rows (+20 )
         </Button>
       </div>

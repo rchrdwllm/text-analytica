@@ -1,7 +1,7 @@
 import { checkHealth } from "@/lib/health";
 
 const HealthCheckPage = async () => {
-  const { success: status } = await checkHealth();
+  const { status, error } = await checkHealth();
 
   return <div>HealthCheckPage: {status}</div>;
 };
