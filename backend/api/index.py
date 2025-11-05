@@ -518,7 +518,16 @@ def author_networks_get():
         if author_name not in all_authors:
             return jsonify({"nodes": [], "links": [], "message": "Author not found"}), 200
 
-        nodes.append({"id": author_name, "group": "author"})
+        # Calculate paper counts for all authors first
+        author_paper_counts = {}
+        for group_name, (model, num_topics, df) in all_topics.items():
+            if "authors" in df.columns:
+                for _, doc in df.iterrows():
+                    authors_list = parse_authors_field(doc.get("authors"))
+                    for author in authors_list:
+                        author_paper_counts[author] = author_paper_counts.get(author, 0) + 1
+
+        nodes.append({"id": author_name, "group": "author", "paper_count": author_paper_counts.get(author_name, 0)})
         added_nodes.add(author_name)
 
         neighbors = list(all_authors.neighbors(author_name))
@@ -526,7 +535,7 @@ def author_networks_get():
         for co_author in neighbors[:50]:
             if co_author not in added_nodes:
                 weight = all_authors[author_name][co_author].get("weight", 1)
-                nodes.append({"id": co_author, "group": "co-author", "weight": weight})
+                nodes.append({"id": co_author, "group": "co-author", "weight": weight, "paper_count": author_paper_counts.get(co_author, 0)})
                 added_nodes.add(co_author)
 
             link_key = tuple(sorted([author_name, co_author]))
@@ -558,7 +567,14 @@ def author_networks_get():
                                         links.append({"source": co_author, "target": paper_id, "value": 1})
                                         added_links.add(link_key)
 
-        response = {"nodes": nodes, "links": links}
+        # Calculate statistics
+        statistics = {
+            "total_co_authors": len([n for n in nodes if n["group"] == "co-author"]),
+            "total_papers": len([n for n in nodes if n["group"] == "paper"]),
+            "total_connections": len(links),
+        }
+
+        response = {"nodes": nodes, "links": links, "statistics": statistics}
         return jsonify(response)
 
     # Otherwise return a limited full graph summary (cap sizes)
@@ -570,10 +586,24 @@ def author_networks_get():
     except Exception:
         weighted_degrees = {n: 0 for n in all_authors.nodes()}
 
+    # Calculate paper count for each author
+    author_paper_counts = {}
+    for group_name, (model, num_topics, df) in all_topics.items():
+        if "authors" in df.columns:
+            for _, doc in df.iterrows():
+                authors_list = parse_authors_field(doc.get("authors"))
+                for author in authors_list:
+                    author_paper_counts[author] = author_paper_counts.get(author, 0) + 1
+
     # limit nodes to first 1000 and links to first 2000 to keep payload reasonable
     node_list = list(all_authors.nodes())[:1000]
     for n in node_list:
-        nodes.append({"id": n, "group": "author", "weight": weighted_degrees.get(n, 0)})
+        nodes.append({
+            "id": n, 
+            "group": "author", 
+            "weight": weighted_degrees.get(n, 0),
+            "paper_count": author_paper_counts.get(n, 0)
+        })
 
     for u, v, data in list(all_authors.edges(data=True))[:2000]:
         links.append({"source": u, "target": v, "value": data.get("weight", 1)})

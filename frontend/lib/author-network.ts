@@ -2,6 +2,7 @@ export interface BackendNode {
   id: string;
   group?: string;
   weight?: number;
+  paper_count?: number;
   year?: string;
   // other optional fields returned by backend
   [k: string]: any;

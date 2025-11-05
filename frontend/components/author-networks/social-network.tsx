@@ -120,7 +120,7 @@ const SocialNetwork = () => {
           id: n.id,
           name: (n.name as string) ?? n.id,
           group: groupIndex(n.group),
-          papers: Number(n.weight ?? 1),
+          papers: Number(n.paper_count ?? 0),
           citations: Number(n.citations ?? 0),
         } as Node)
     );

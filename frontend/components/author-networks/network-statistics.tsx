@@ -1,6 +1,9 @@
 "use client";
 
-import { fetchNetworkStatistics, NetworkStatistics as NetworkStatisticsType } from "@/lib/network-statistics";
+import {
+  fetchNetworkStatistics,
+  NetworkStatistics as NetworkStatisticsType,
+} from "@/lib/network-statistics";
 import { useEffect, useState } from "react";
 
 const NetworkStatistics = () => {
@@ -16,7 +19,11 @@ const NetworkStatistics = () => {
         setData(statistics);
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load network statistics");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load network statistics"
+        );
       } finally {
         setLoading(false);
       }
