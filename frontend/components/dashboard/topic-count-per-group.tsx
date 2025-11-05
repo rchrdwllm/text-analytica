@@ -46,17 +46,21 @@ const TopicCountPerYear = () => {
       setDocuments(documents);
     })();
 
-    return () => {isCancelled = true;};
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   return (
     <article className="flex flex-col space-y-2 bg-card p-4 rounded-lg h-full">
-      <h2 className="font-medium text-lg">Topic Count per Group</h2>
+      <h2 className="flex-shrink-0 font-medium text-lg">
+        Topic Count per Group
+      </h2>
       <ChartContainer
         config={{ count: { color: "var(--chart-5)" } }}
-        className="flex-1 w-full [&_.recharts-bar-rectangle]:transition-all"
+        className="flex-1 w-full min-h-0 [&_.recharts-bar-rectangle]:transition-all"
       >
-        <ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={documents}
             margin={{ top: 24, right: 8, left: 0, bottom: 0 }}
@@ -76,8 +80,7 @@ const TopicCountPerYear = () => {
               tickFormatter={(value: number | string) =>
                 Number(value).toLocaleString()
               }
-              domain={[0, "dataMax + 20"]}
-              ticks={[0, 25, 50, 75, 100, 125]}
+              domain={[0, "dataMax + 2"]}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
 
