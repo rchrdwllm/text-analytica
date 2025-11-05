@@ -2,7 +2,7 @@
 
 A comprehensive text analytics platform for analyzing scientific research papers using LDA (Latent Dirichlet Allocation) topic modeling, author network analysis, and document similarity detection.
 
-![Text Analytica Screenshot](public/images/screenshot.png)
+![Text Analytica Screenshot](frontend\public\images\text_analytica.png)
 
 ## 🌟 Features
 
