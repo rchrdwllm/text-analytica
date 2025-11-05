@@ -40,11 +40,11 @@ const TopicsTable = () => {
 
       try {
         const response = await callApi(`/api/corpus-topics/${selectedYear}`);
-        
+
         if (response.error) {
           throw response.error;
         }
-        
+
         setTopics(response.success);
       } catch (err) {
         console.error("Error fetching topics:", err);
@@ -63,21 +63,19 @@ const TopicsTable = () => {
       <h2 className="mb-4 font-medium text-lg">
         Topics {selectedYear && `- ${selectedYear}`}
       </h2>
-      
+
       {!selectedYear ? (
-        <div className="py-8 text-center text-muted-foreground">
+        <div className="py-8 text-muted-foreground text-center">
           Select a year group to view topics
         </div>
       ) : loading ? (
-        <div className="py-8 text-center text-muted-foreground">
+        <div className="py-8 text-muted-foreground text-center">
           Loading topics...
         </div>
       ) : error ? (
-        <div className="py-8 text-center text-destructive">
-          {error}
-        </div>
+        <div className="py-8 text-destructive text-center">{error}</div>
       ) : topics.length === 0 ? (
-        <div className="py-8 text-center text-muted-foreground">
+        <div className="py-8 text-muted-foreground text-center">
           No topics found
         </div>
       ) : (
@@ -85,9 +83,9 @@ const TopicsTable = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Topic</TableHead>
-                <TableHead>Document</TableHead>
-                <TableHead className="w-[150px] text-right">
+                <TableHead className="min-w-[200px]">Topic</TableHead>
+                <TableHead className="min-w-[300px]">Document</TableHead>
+                <TableHead className="min-w-[150px] text-right">
                   Coherence Score
                 </TableHead>
               </TableRow>
@@ -100,16 +98,18 @@ const TopicsTable = () => {
                       {docIndex === 0 ? (
                         <TableCell
                           rowSpan={topicData.documents.length}
-                          className="font-medium align-top"
+                          className="min-w-[200px] font-medium break-words align-top whitespace-normal"
                         >
                           {topicData.topic}
                         </TableCell>
                       ) : null}
-                      <TableCell>{doc.title}</TableCell>
+                      <TableCell className="break-words whitespace-normal">
+                        {doc.title}
+                      </TableCell>
                       {docIndex === 0 ? (
                         <TableCell
                           rowSpan={topicData.documents.length}
-                          className="text-right align-top"
+                          className="min-w-[150px] text-right break-words align-top whitespace-normal"
                         >
                           {(topicData.coherence * 100).toFixed(2)}%
                         </TableCell>

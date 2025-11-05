@@ -4,15 +4,6 @@ import TopicsTable from "@/components/corpus-topics/topics-table";
 import WordCloud from "@/components/corpus-topics/word-cloud";
 import YearCard from "@/components/corpus-topics/year-card";
 import ErrorAlert from "@/components/ui/error-alert";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { SelectedYearProvider } from "@/context/selected-year-context";
 import { getCorpusTopics } from "@/lib/topics";
 import { useEffect, useState } from "react";
@@ -32,8 +23,10 @@ const CorpusTopics = () => {
           setError(result.error);
         } else {
           const data = result.data;
-          data.sort((a: any, b: any) =>
-            parseInt(b.group_name.split("_")[0]) - parseInt(a.group_name.split("-")[0])
+          data.sort(
+            (a: any, b: any) =>
+              parseInt(b.group_name.split("_")[0]) -
+              parseInt(a.group_name.split("-")[0])
           );
           setAllTopics(result);
         }
@@ -43,8 +36,6 @@ const CorpusTopics = () => {
         setLoading(false);
       }
     })();
-
-    
   }, []);
 
   if (loading) {
@@ -69,19 +60,8 @@ const CorpusTopics = () => {
         <h1 className="top-6 sticky self-start mb-4 font-semibold text-2xl">
           Corpus Topics
         </h1>
-        <div className="flex gap-4">
-          <aside className="top-[calc(2.5rem+31.99px)] sticky self-start space-y-4 rounded-lg w-full max-w-[320px] h-[calc(100vh-1.5rem-31.99px-2.5rem)] overflow-y-auto scrollbar-hide">
-            <Select defaultValue="arxiv">
-              <SelectTrigger className="bg-none border-none w-full">
-                <SelectValue placeholder="Select corpus" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Corpus</SelectLabel>
-                  <SelectItem value="arxiv">arXiv</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+        <div className="flex gap-4 shrink-0">
+          <aside className="top-[calc(2.5rem+31.99px)] sticky self-start space-y-4 rounded-lg w-full min-w-[320px] max-w-[320px] h-[calc(100vh-1.5rem-31.99px-2.5rem)] overflow-y-auto scrollbar-hide">
             {allTopics.data.map((s: any) => (
               <YearCard
                 key={s.group_name}
