@@ -38,12 +38,20 @@ const SimilarDocuments = ({ data }: Props) => {
     {
       accessorKey: "document",
       header: "Document",
-      cell: ({ row }) => <div>{row.getValue("document")}</div>,
+      cell: ({ row }) => (
+        <div className="min-w-[300px] break-words whitespace-normal">
+          {row.getValue("document")}
+        </div>
+      ),
     },
     {
       accessorKey: "author",
       header: "Author",
-      cell: ({ row }) => <div>{row.getValue("author")}</div>,
+      cell: ({ row }) => (
+        <div className="min-w-[200px] break-words whitespace-normal">
+          {row.getValue("author")}
+        </div>
+      ),
     },
   ];
 
