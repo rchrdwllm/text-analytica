@@ -9,7 +9,6 @@ export const UploadFormSchema = z
         message: "Only PDF files are allowed",
       })
       .optional(),
-    corpus: z.string().min(1, "Please select a corpus"),
   })
   .refine((data) => data.rawSummary || data.file, {
     message: "Please provide either a raw summary or upload a file",

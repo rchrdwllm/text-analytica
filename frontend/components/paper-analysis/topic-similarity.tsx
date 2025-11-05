@@ -9,6 +9,7 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import { useState } from "react";
+import type { TopicSimilarityItem } from "@/types";
 import {
   Table,
   TableBody,
@@ -18,34 +19,41 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type TopicData = {
+type TopicRow = {
   topic: string;
-  coherenceScore: string;
+  coherenceScore: number;
 };
 
-const data: TopicData[] = [
-  { topic: "A, B, C", coherenceScore: "0.00%" },
-  { topic: "D, E, F", coherenceScore: "0.00%" },
-];
+type TopicSimilarityProps = {
+  topics: TopicSimilarityItem[];
+};
 
-const columns: ColumnDef<TopicData>[] = [
-  {
-    accessorKey: "topic",
-    header: "Topic",
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("topic")}</div>
-    ),
-  },
-  {
-    accessorKey: "coherenceScore",
-    header: () => <div className="text-right">Coherence Score</div>,
-    cell: ({ row }) => (
-      <div className="text-right">{row.getValue("coherenceScore")}</div>
-    ),
-  },
-];
+const TopicSimilarity = ({ topics = [] }: TopicSimilarityProps) => {
+  const data: TopicRow[] = topics.map((t) => ({
+    topic: t.label,
+    coherenceScore: t.probability,
+  }));
 
-const TopicSimilarity = () => {
+  const columns: ColumnDef<TopicRow>[] = [
+    {
+      accessorKey: "topic",
+      header: "Topic",
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("topic")}</div>
+      ),
+    },
+    {
+      accessorKey: "coherenceScore",
+      header: () => <div className="text-right">Coherence Score</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          {(row.getValue<number>("coherenceScore") * 100).toFixed(2)}%
+        </div>
+      ),
+      enableSorting: true,
+    },
+  ];
+
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({

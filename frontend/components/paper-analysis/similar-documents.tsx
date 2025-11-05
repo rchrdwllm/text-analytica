@@ -17,41 +17,40 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { SimilarDocument } from "@/types";
 
 type DocumentData = {
   document: string;
   author: string;
 };
 
-const data: DocumentData[] = [
-  {
-    document: "A Market-Oriented Progr...",
-    author: "M. P. Wellman",
-  },
-  {
-    document: "An Empirical Analysis of...",
-    author: "I. P. Gent",
-  },
-];
+type Props = {
+  data?: SimilarDocument[] | null;
+};
 
-const columns: ColumnDef<DocumentData>[] = [
-  {
-    accessorKey: "document",
-    header: "Document",
-    cell: ({ row }) => <div>{row.getValue("document")}</div>,
-  },
-  {
-    accessorKey: "author",
-    header: "Author",
-    cell: ({ row }) => <div>{row.getValue("author")}</div>,
-  },
-];
+const SimilarDocuments = ({ data }: Props) => {
+  const rows: DocumentData[] = (data || []).map((d) => ({
+    document: d.title,
+    author: (d.authors || []).join(", "),
+  }));
 
-const SimilarDocuments = () => {
+  const columns: ColumnDef<DocumentData>[] = [
+    {
+      accessorKey: "document",
+      header: "Document",
+      cell: ({ row }) => <div>{row.getValue("document")}</div>,
+    },
+    {
+      accessorKey: "author",
+      header: "Author",
+      cell: ({ row }) => <div>{row.getValue("author")}</div>,
+    },
+  ];
+
   const [sorting, setSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
-    data,
+    data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
