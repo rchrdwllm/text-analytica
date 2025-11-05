@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
+import {
+  fetchAuthorNetwork,
+  fetchFullGraph,
+  BackendNode,
+  BackendLink,
+} from "@/lib/author-network";
+import { Spinner } from "@/components/ui/spinner";
 
 interface Node extends d3.SimulationNodeDatum {
   id: string;
@@ -17,146 +24,7 @@ interface Link extends d3.SimulationLinkDatum<Node> {
   value: number;
 }
 
-// Simulated arXiv author network data
-const generateAuthorNetwork = () => {
-  // Research areas/groups
-  const researchAreas = [
-    "Machine Learning",
-    "Quantum Physics",
-    "Astrophysics",
-    "Computer Vision",
-    "Natural Language Processing",
-    "Cryptography",
-    "Condensed Matter",
-    "High Energy Physics",
-  ];
-
-  // Generate realistic author names
-  const firstNames = [
-    "Alice",
-    "Bob",
-    "Carol",
-    "David",
-    "Emma",
-    "Frank",
-    "Grace",
-    "Henry",
-    "Isabel",
-    "Jack",
-    "Karen",
-    "Leo",
-    "Maria",
-    "Nathan",
-    "Olivia",
-    "Peter",
-    "Quinn",
-    "Rachel",
-    "Sam",
-    "Tina",
-    "Uma",
-    "Victor",
-    "Wendy",
-    "Xavier",
-    "Yuki",
-    "Zoe",
-    "Alex",
-    "Ben",
-    "Claire",
-    "Dan",
-  ];
-
-  const lastNames = [
-    "Smith",
-    "Johnson",
-    "Williams",
-    "Brown",
-    "Jones",
-    "Garcia",
-    "Miller",
-    "Davis",
-    "Rodriguez",
-    "Martinez",
-    "Hernandez",
-    "Lopez",
-    "Wilson",
-    "Anderson",
-    "Thomas",
-    "Taylor",
-    "Moore",
-    "Jackson",
-    "Martin",
-    "Lee",
-    "Thompson",
-    "White",
-    "Harris",
-    "Clark",
-    "Lewis",
-    "Walker",
-    "Hall",
-    "Allen",
-    "Young",
-    "King",
-  ];
-
-  const nodes: Node[] = [];
-  const links: Link[] = [];
-
-  // Generate 50 authors
-  for (let i = 0; i < 50; i++) {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-    nodes.push({
-      id: `author${i}`,
-      name: `${firstName} ${lastName}`,
-      group: Math.floor(Math.random() * researchAreas.length),
-      papers: Math.floor(Math.random() * 50) + 5,
-      citations: Math.floor(Math.random() * 1000) + 10,
-    });
-  }
-
-  // Generate collaboration links (co-authorship)
-  // Authors in the same research area are more likely to collaborate
-  for (let i = 0; i < nodes.length; i++) {
-    const numCollaborations = Math.floor(Math.random() * 5) + 1;
-    for (let j = 0; j < numCollaborations; j++) {
-      let targetIndex;
-      // 70% chance to collaborate with someone in the same group
-      if (Math.random() < 0.7) {
-        const sameGroupAuthors = nodes.filter(
-          (n, idx) => n.group === nodes[i].group && idx !== i
-        );
-        if (sameGroupAuthors.length > 0) {
-          targetIndex = nodes.indexOf(
-            sameGroupAuthors[
-              Math.floor(Math.random() * sameGroupAuthors.length)
-            ]
-          );
-        } else {
-          targetIndex = Math.floor(Math.random() * nodes.length);
-        }
-      } else {
-        targetIndex = Math.floor(Math.random() * nodes.length);
-      }
-
-      if (
-        targetIndex !== i &&
-        !links.some(
-          (l) =>
-            (l.source === nodes[i].id && l.target === nodes[targetIndex].id) ||
-            (l.source === nodes[targetIndex].id && l.target === nodes[i].id)
-        )
-      ) {
-        links.push({
-          source: nodes[i].id,
-          target: nodes[targetIndex].id,
-          value: Math.floor(Math.random() * 5) + 1, // number of co-authored papers
-        });
-      }
-    }
-  }
-
-  return { nodes, links, researchAreas };
-};
+// Demo generator removed — visualization relies on backend graph data now.
 
 const SocialNetwork = () => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -182,13 +50,107 @@ const SocialNetwork = () => {
   }, []);
 
   const [researchAreas, setResearchAreas] = useState<string[]>([]);
+  const [network, setNetwork] = useState<{
+    nodes: BackendNode[];
+    links: BackendLink[];
+  } | null>(null);
+  const [authorQuery, setAuthorQuery] = useState("");
+  const [loadingNetwork, setLoadingNetwork] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+
+  // Map backend group strings to a numeric group index for color scale
+  const groupIndex = (g: any) => {
+    if (typeof g === "number") return g;
+    if (!g) return 0;
+    const s = String(g).toLowerCase();
+    if (s === "author") return 0;
+    if (s === "co-author") return 1;
+    if (s === "paper") return 2;
+    return 3;
+  };
+
+  async function loadGraphForAuthor(author: string) {
+    setLoadingNetwork(true);
+    setNetworkError(null);
+    try {
+      const json = await fetchAuthorNetwork(author);
+      setNetwork({ nodes: json.nodes ?? [], links: json.links ?? [] });
+    } catch (err: any) {
+      setNetworkError(String(err?.message ?? err));
+      setNetwork(null);
+    } finally {
+      setLoadingNetwork(false);
+    }
+  }
+
+  async function loadFullGraph() {
+    setLoadingNetwork(true);
+    setNetworkError(null);
+    try {
+      const json = await fetchFullGraph();
+      setNetwork({ nodes: json.nodes ?? [], links: json.links ?? [] });
+    } catch (err: any) {
+      setNetworkError(String(err?.message ?? err));
+      setNetwork(null);
+    } finally {
+      setLoadingNetwork(false);
+    }
+  }
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || dimensions.height === 0)
       return;
 
-    const { nodes, links, researchAreas: areas } = generateAuthorNetwork();
-    setResearchAreas(areas);
+    // Only render when we have backend data. Clear SVG and show nothing while loading.
+    if (
+      !network ||
+      !Array.isArray(network.nodes) ||
+      !Array.isArray(network.links)
+    ) {
+      d3.select(svgRef.current).selectAll("*").remove();
+      return;
+    }
+
+    const nodesData: Node[] = network.nodes.map(
+      (n) =>
+        ({
+          id: n.id,
+          name: (n.name as string) ?? n.id,
+          group: groupIndex(n.group),
+          papers: Number(n.weight ?? 1),
+          citations: Number(n.citations ?? 0),
+        } as Node)
+    );
+
+    let linksData: Link[] = network.links.map(
+      (l) =>
+        ({
+          source: String(l.source),
+          target: String(l.target),
+          value: Number(l.value ?? 1),
+        } as Link)
+    );
+
+    // keep current research area labels (backend doesn't provide them)
+    setResearchAreas(researchAreas);
+
+    // Sanitize links: remove any links that reference missing node ids (avoids d3 "node not found" errors)
+    const nodeIdSet = new Set(nodesData.map((n) => n.id));
+    linksData = linksData.filter(
+      (l) => nodeIdSet.has(String(l.source)) && nodeIdSet.has(String(l.target))
+    );
+
+    // Ensure nodes have initial x/y positions so drag/zoom won't create NaN positions
+    // (some backend subgraphs may come without x/y set and d3 drag will then set fx/fy to undefined)
+    nodesData.forEach((n, i) => {
+      if (n.x == null || Number.isNaN(n.x as number)) {
+        // small jitter so nodes don't start exactly on top of each other
+        n.x = dimensions.width / 2 + (Math.random() - 0.5) * 50;
+      }
+      if (n.y == null || Number.isNaN(n.y as number)) {
+        n.y = dimensions.height / 2 + (Math.random() - 0.5) * 50;
+      }
+    });
 
     // Clear previous content
     d3.select(svgRef.current).selectAll("*").remove();
@@ -204,11 +166,11 @@ const SocialNetwork = () => {
 
     // Create the simulation
     const simulation = d3
-      .forceSimulation(nodes)
+      .forceSimulation(nodesData)
       .force(
         "link",
         d3
-          .forceLink<Node, Link>(links)
+          .forceLink<Node, Link>(linksData)
           .id((d) => d.id)
           .distance(50)
       )
@@ -225,7 +187,7 @@ const SocialNetwork = () => {
     // Add zoom behavior
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.5, 5])
+      .scaleExtent([0.1, 5])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
@@ -238,9 +200,9 @@ const SocialNetwork = () => {
       .attr("stroke", "#999")
       .attr("stroke-opacity", 0.6)
       .selectAll<SVGLineElement, Link>("line")
-      .data(links)
+      .data(linksData)
       .join("line")
-      .attr("stroke-width", (d) => Math.sqrt(d.value));
+      .attr("stroke-width", (d: any) => Math.sqrt((d as any).value));
 
     // Create nodes
     const node = g
@@ -248,17 +210,17 @@ const SocialNetwork = () => {
       .attr("stroke", "#fff")
       .attr("stroke-width", 1.5)
       .selectAll<SVGCircleElement, Node>("circle")
-      .data(nodes)
+      .data(nodesData)
       .join("circle")
-      .attr("r", (d) => Math.sqrt(d.papers) + 3)
-      .attr("fill", (d) => color(d.group.toString()))
+      .attr("r", (d: any) => Math.sqrt((d as any).papers) + 3)
+      .attr("fill", (d: any) => color(String((d as any).group)))
       .style("cursor", "pointer")
       .call(
         d3
-          .drag<SVGCircleElement, Node>()
+          .drag<SVGCircleElement, any>()
           .on("start", dragstarted)
           .on("drag", dragged)
-          .on("end", dragended)
+          .on("end", dragended) as unknown as any
       );
 
     // Add labels
@@ -266,9 +228,12 @@ const SocialNetwork = () => {
       .append("g")
       .attr("class", "labels")
       .selectAll<SVGTextElement, Node>("text")
-      .data(nodes)
+      .data(nodesData)
       .join("text")
-      .text((d) => d.name.split(" ")[1]) // Show last name only
+      .text(
+        (d: any) =>
+          ((d.name || d.id) as string).split(" ")[1] ?? (d.name || d.id)
+      ) // Show last name only when available
       .attr("font-size", 10)
       .attr("dx", 12)
       .attr("dy", 4)
@@ -279,33 +244,50 @@ const SocialNetwork = () => {
     node
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke", "#000").attr("stroke-width", 2);
-        setSelectedNode(d);
+        setSelectedNode(d as Node);
       })
       .on("mouseout", function () {
         d3.select(this).attr("stroke", "#fff").attr("stroke-width", 1.5);
       })
       .on("click", function (event, d) {
-        setSelectedNode(d);
+        setSelectedNode(d as Node);
       });
 
     // Update positions on each tick
     simulation.on("tick", () => {
       link
-        .attr("x1", (d) => (d.source as Node).x!)
-        .attr("y1", (d) => (d.source as Node).y!)
-        .attr("x2", (d) => (d.target as Node).x!)
-        .attr("y2", (d) => (d.target as Node).y!);
+        .attr("x1", (d: any) => (d.source as any as Node).x!)
+        .attr("y1", (d: any) => (d.source as any as Node).y!)
+        .attr("x2", (d: any) => (d.target as any as Node).x!)
+        .attr("y2", (d: any) => (d.target as any as Node).y!);
 
-      node.attr("cx", (d) => d.x!).attr("cy", (d) => d.y!);
+      node
+        .attr("cx", (d: any) => (d as any).x!)
+        .attr("cy", (d: any) => (d as any).y!);
 
-      label.attr("x", (d) => d.x!).attr("y", (d) => d.y!);
+      label
+        .attr("x", (d: any) => (d as any).x!)
+        .attr("y", (d: any) => (d as any).y!);
     });
 
     // Drag functions
     function dragstarted(event: d3.D3DragEvent<SVGCircleElement, Node, Node>) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
-      event.subject.fx = event.subject.x;
-      event.subject.fy = event.subject.y;
+      // If the node has no x/y yet, fall back to the pointer coordinates so
+      // fx/fy are numeric (avoids NaN positions which make the graph disappear).
+      // Use == null to catch both null and undefined.
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore - event.subject may be typed loosely by d3, we just need numeric coords
+      event.subject.fx =
+        event.subject.x == null
+          ? (event.x as number)
+          : (event.subject.x as number);
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      event.subject.fy =
+        event.subject.y == null
+          ? (event.y as number)
+          : (event.subject.y as number);
     }
 
     function dragged(event: d3.D3DragEvent<SVGCircleElement, Node, Node>) {
@@ -323,28 +305,59 @@ const SocialNetwork = () => {
     return () => {
       simulation.stop();
     };
-  }, [dimensions]);
+  }, [dimensions, network]);
+
+  // load full graph when component mounts
+  useEffect(() => {
+    loadFullGraph();
+  }, []);
 
   return (
     <article className="flex flex-col bg-card p-4 rounded-lg h-full">
       <div className="mb-4">
         <h2 className="font-medium text-lg">Social Network of Authors</h2>
         <p className="mt-1 text-muted-foreground text-sm">
-          Node size represents number of papers, colors represent research
-          areas.
+          Node size represents number of papers
         </p>
+        <div className="flex gap-2 mt-2">
+          <input
+            className="input input-sm"
+            placeholder="Author name (exact)"
+            value={authorQuery}
+            onChange={(e) => setAuthorQuery(e.target.value)}
+          />
+          <button
+            className="btn btn-sm"
+            onClick={() => loadGraphForAuthor(authorQuery)}
+            disabled={loadingNetwork}
+          >
+            {loadingNetwork ? "Loading..." : "Load"}
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={() => loadFullGraph()}
+            disabled={loadingNetwork}
+          >
+            Refresh Full Graph
+          </button>
+          {networkError && (
+            <div className="ml-2 text-red-500 text-xs">{networkError}</div>
+          )}
+        </div>
       </div>
       <div className="relative flex-1" ref={containerRef}>
         <svg ref={svgRef} className="w-full h-full" />
+        {loadingNetwork && (
+          <div className="z-10 absolute inset-0 flex justify-center items-center">
+            <Spinner className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        )}
       </div>
       {selectedNode && (
         <div className="bg-muted mt-4 p-3 rounded-md text-sm">
           <div className="font-semibold">{selectedNode.name}</div>
           <div className="mt-1 text-muted-foreground">
-            Research Area: {researchAreas[selectedNode.group]}
-          </div>
-          <div className="mt-1 text-muted-foreground">
-            Papers: {selectedNode.papers} | Citations: {selectedNode.citations}
+            Papers: {selectedNode.papers}
           </div>
         </div>
       )}

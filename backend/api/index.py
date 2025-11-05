@@ -12,6 +12,8 @@ import nltk
 import re
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+import ast
+import json
 from scipy.spatial.distance import cosine
 
 app = Flask(__name__)
@@ -32,6 +34,50 @@ def parse_date(string: str):
         case v:
             print(f"Unknown format: {v}")
             return None
+
+
+def parse_authors_field(value):
+    """Safely parse the authors field which may be stored as:
+    - a Python-style list string (e.g. "['A','B']")
+    - a JSON array string
+    - an actual Python list
+    - a comma-separated string
+    Returns a list of author strings (or empty list on failure).
+    """
+    if value is None:
+        return []
+    # Already a list
+    if isinstance(value, list):
+        return value
+    # Not a string -> wrap
+    if not isinstance(value, str):
+        return [value]
+
+    s = value.strip()
+    # Try ast.literal_eval first (safe for Python literals)
+    try:
+        parsed = ast.literal_eval(s)
+        if isinstance(parsed, list):
+            return parsed
+        # If it's a single string, return as single-element list
+        if isinstance(parsed, str):
+            return [parsed]
+    except Exception:
+        pass
+
+    # Try JSON
+    try:
+        parsed = json.loads(s)
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, str):
+            return [parsed]
+    except Exception:
+        pass
+
+    # Fallback: split by comma
+    parts = [p.strip() for p in s.split(",") if p.strip()]
+    return parts
 
 
 def load_dataset():
@@ -83,7 +129,7 @@ def load_author_graph():
         # Iterate through each row of the DataFrame
         for index, row in dataset_df.iterrows():
             print(f"{index}/{len(dataset_df)}")
-            authors = eval(row["authors"])
+            authors = parse_authors_field(row.get("authors"))
 
             # Add nodes for each author
             for author in authors:
@@ -172,11 +218,7 @@ def corpus_documents():
             documents.append(
                 {
                     "title": row["title"],
-                    "authors": (
-                        eval(row["authors"])
-                        if isinstance(row["authors"], str)
-                        else row["authors"]
-                    ),
+                    "authors": parse_authors_field(row.get("authors")),
                     "publicationYear": (
                         parse_date(row["published_date"])[2]
                         if "published_date" in row
@@ -381,13 +423,8 @@ def author_networks():
     for group_name, (model, num_topics, df) in all_topics.items():
         if "authors" in df.columns and "title" in df.columns:
             for _, doc in df.iterrows():
-                try:
-                    authors_list = (
-                        eval(doc["authors"])
-                        if isinstance(doc["authors"], str)
-                        else doc["authors"]
-                    )
-                    if author_name in authors_list:
+                authors_list = parse_authors_field(doc.get("authors"))
+                if author_name in authors_list:
                         # Add paper node
                         paper_id = doc.get("title", "Unknown")
                         if paper_id not in added_nodes:
@@ -417,8 +454,7 @@ def author_networks():
                                         }
                                     )
                                     added_links.add(link_key)
-                except:
-                    continue
+                
 
     response = {
         "nodes": nodes,
@@ -430,6 +466,88 @@ def author_networks():
         },
     }
     return jsonify(response)
+
+
+@app.route("/api/author-networks", methods=["GET"])
+def author_networks_get():
+    """
+    GET endpoint to return either a full (limited) author graph or a subgraph
+    for a specific author when ?author_name= is provided.
+    """
+    author_name = request.args.get("author_name", "")
+
+    # If an author is requested, mirror the POST behavior (return subgraph)
+    if author_name:
+        nodes = []
+        links = []
+        added_nodes = set()
+        added_links = set()
+
+        if author_name not in all_authors:
+            return jsonify({"nodes": [], "links": [], "message": "Author not found"}), 200
+
+        nodes.append({"id": author_name, "group": "author"})
+        added_nodes.add(author_name)
+
+        neighbors = list(all_authors.neighbors(author_name))
+
+        for co_author in neighbors[:50]:
+            if co_author not in added_nodes:
+                weight = all_authors[author_name][co_author].get("weight", 1)
+                nodes.append({"id": co_author, "group": "co-author", "weight": weight})
+                added_nodes.add(co_author)
+
+            link_key = tuple(sorted([author_name, co_author]))
+            if link_key not in added_links:
+                weight = all_authors[author_name][co_author].get("weight", 1)
+                links.append({"source": author_name, "target": co_author, "value": weight})
+                added_links.add(link_key)
+
+        # papers
+        for group_name, (model, num_topics, df) in all_topics.items():
+            if "authors" in df.columns and "title" in df.columns:
+                for _, doc in df.iterrows():
+                    authors_list = parse_authors_field(doc.get("authors"))
+                    if author_name in authors_list:
+                            paper_id = doc.get("title", "Unknown")
+                            if paper_id not in added_nodes:
+                                nodes.append({"id": paper_id, "group": "paper", "year": group_name})
+                                added_nodes.add(paper_id)
+
+                            link_key = (author_name, paper_id)
+                            if link_key not in added_links:
+                                links.append({"source": author_name, "target": paper_id, "value": 1})
+                                added_links.add(link_key)
+
+                            for co_author in authors_list:
+                                if co_author != author_name and co_author in added_nodes:
+                                    link_key = (co_author, paper_id)
+                                    if link_key not in added_links:
+                                        links.append({"source": co_author, "target": paper_id, "value": 1})
+                                        added_links.add(link_key)
+                    
+
+        response = {"nodes": nodes, "links": links}
+        return jsonify(response)
+
+    # Otherwise return a limited full graph summary (cap sizes)
+    nodes = []
+    links = []
+    # compute weighted degree for node sizing
+    try:
+        weighted_degrees = {n: int(all_authors.degree(n, weight="weight") or 0) for n in all_authors.nodes()}
+    except Exception:
+        weighted_degrees = {n: 0 for n in all_authors.nodes()}
+
+    # limit nodes to first 1000 and links to first 2000 to keep payload reasonable
+    node_list = list(all_authors.nodes())[:1000]
+    for n in node_list:
+        nodes.append({"id": n, "group": "author", "weight": weighted_degrees.get(n, 0)})
+
+    for u, v, data in list(all_authors.edges(data=True))[:2000]:
+        links.append({"source": u, "target": v, "value": data.get("weight", 1)})
+
+    return jsonify({"nodes": nodes, "links": links, "statistics": {"nodes": len(nodes), "links": len(links)}})
 
 
 @app.route("/api/paper-analysis", methods=["POST"])
@@ -552,11 +670,7 @@ def paper_analysis():
                 for sim_doc in similarities[:5]:
                     row = sim_doc["row"]
                     try:
-                        authors = (
-                            eval(row["authors"])
-                            if isinstance(row["authors"], str)
-                            else row["authors"]
-                        )
+                        authors = parse_authors_field(row.get("authors"))
                     except:
                         authors = ["Unknown"]
 
