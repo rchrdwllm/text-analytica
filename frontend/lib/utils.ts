@@ -11,6 +11,7 @@ export const callApi = async (endpoint: string) => {
   }${endpoint}`;
 
   try {
+    console.log(`Calling API ${endpoint}`)
     const res = await axios.get(url);
     const { data } = res;
 

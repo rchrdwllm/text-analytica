@@ -14,9 +14,9 @@ export const getCorpusTopics = async () => {
 
   return { data } as { data: TopicSummary[]; error: null };};
 
-export const getTrendingTopicsPerYear = async () => {
+export const getTrendingTopicsPerGroup = async () => {
   const { success: trendingTopics, error } = await callApi(
-    "/api/trending-topics-per-year"
+    "/api/trending-topics-per-group"
   );
 
   if (error) {

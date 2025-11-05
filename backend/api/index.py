@@ -264,31 +264,53 @@ def corpus_documents():
 
 
 @app.route("/api/topic-count-per-group")
-def topic_count_per_year():
+def topic_count_per_group():
     """
     Returns the topic count per group.
     """
-    result = []
-    for group_name, (model, num_topics, df) in all_topics.items():
-        result.append(
-            {
-                "group": group_name,
-                "topic_count": num_topics,
-                "document_count": df.nunique(),
-            }
-        )
+    result = [
+        { "group": group_name, "topic_count": num_topics }
+        for group_name, (_, num_topics, _) in all_topics.items()
+    ]
+
+    print(result)
+
     return jsonify(result)
 
 
-@app.route("/api/trending-topics-per-year")
-def trending_topics_per_year():
+@app.route("/api/trending-topics-per-group")
+def trending_topics_per_group():
     """
     Returns the trending topics per year with top keywords.
+    Vectorized version for better performance.
     """
     result = []
     for group_name, (model, num_topics, df) in all_topics.items():
         # Get all topics for this year group
         topics_data = []
+
+        # Vectorized computation: process all documents at once
+        if "processed_summary" in df.columns:
+            # Get dominant topics for all documents at once
+            def get_dominant_topic(summary):
+                if not summary:
+                    return -1
+                bow = model.id2word.doc2bow(summary)
+                if not bow:
+                    return -1
+                doc_topics = model.get_document_topics(bow)
+                if doc_topics:
+                    return max(doc_topics, key=lambda x: x[1])[0]
+                return -1
+            
+            # Vectorized operation using pandas apply
+            valid_summaries = df['processed_summary'].notna()
+            dominant_topics = df[valid_summaries]['processed_summary'].apply(get_dominant_topic)
+            
+            # Count documents per topic using value_counts
+            topic_counts = dominant_topics[dominant_topics >= 0].value_counts().to_dict()
+        else:
+            topic_counts = {}
 
         for topic_id in range(num_topics):
             # Get top 10 words for this topic
@@ -297,18 +319,8 @@ def trending_topics_per_year():
                 {"word": word, "weight": float(weight)} for word, weight in top_words
             ]
 
-            # Calculate topic prevalence by counting how many documents have this as dominant topic
-            topic_count = 0
-            if "procseed_summary" not in df.columns: continue
-
-            for _, row in df.iterrows():
-                if (processed_summary := row.get("processed_summary")):
-                    bow = model.id2word.doc2bow(processed_summary)
-                    doc_topics = model.get_document_topics(bow)
-                    if doc_topics:
-                        dominant_topic = max(doc_topics, key=lambda x: x[1])[0]
-                        if dominant_topic == topic_id:
-                            topic_count += 1
+            # Get document count from precomputed counts
+            topic_count = topic_counts.get(topic_id, 0)
 
             topics_data.append(
                 {

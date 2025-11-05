@@ -1,14 +1,14 @@
 "use client";
 
 import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  ResponsiveContainer,
   Cell,
   LabelList,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
 } from "recharts";
 
 import {
@@ -43,13 +43,13 @@ const CustomLabel = (props: any) => {
   );
 };
 
-type TrendingTopicsPerYearProps = {
+type TrendingTopicsPerGroupProps = {
   trendingTopics: TrendingTopic[];
 };
 
-const TrendingTopicsPerYear = ({
+const TrendingTopicsPerGroup = ({
   trendingTopics = [],
-}: TrendingTopicsPerYearProps) => {
+}: TrendingTopicsPerGroupProps) => {
   // derive years from incoming data; fall back to sample years if empty
   const years: string[] =
     trendingTopics.length > 0
@@ -147,4 +147,4 @@ const TrendingTopicsPerYear = ({
   );
 };
 
-export default TrendingTopicsPerYear;
+export default TrendingTopicsPerGroup;
