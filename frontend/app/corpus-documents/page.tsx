@@ -13,8 +13,7 @@ const CorpusDocumentsPage = async () => {
         <h1 className="font-semibold text-2xl">Corpus Documents</h1>
         <SearchCorpusForm />
         {error && <ErrorAlert error={error} />}
-        {/* <CorpusTable initialFullData={documents} initialRenderedCount={20} /> */}
-        <CorpusTable />
+        <CorpusTable initialFullData={documents} initialRenderedCount={20} />
       </main>
     </CorpusSearchContextWrapper>
   );

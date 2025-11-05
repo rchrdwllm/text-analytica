@@ -9,7 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Document } from "@/lib/documents";
-import { callApi } from "@/lib/utils";
 import {
   ColumnDef,
   flexRender,
@@ -54,47 +53,27 @@ const columns: ColumnDef<Document>[] = [
   },
 ];
 
-const CorpusTable = ({ initialFullData = [], initialRenderedCount = 20 }) => {
+const CorpusTable = ({
+  initialFullData = [],
+  initialRenderedCount = 20,
+}: CorpusTableProps) => {
   const { searchQuery } = useContext(CorpusSearchContext);
-  const [renderedCount, setRenderedCount] = useState(0);
+  const [renderedCount, setRenderedCount] = useState(initialRenderedCount);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [data, setData] = useState([] as Document[]);
-  const [fullData, setFullData] = useState([] as Document[]);
   const [filteredData, setFilteredData] = useState([] as Document[]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const result = await callApi("/api/corpus-documents");
-      if (cancelled || result.success == null) return;
-
-      const data = result.success as Document[];
-      for (const row of data) {
-        /// sybau
-        row["authors"] = (row["authors"] as unknown as string[]).join(", ");
-      }
-
-      data.sort(
-        (a: Document, b: Document) => b.publicationYear - a.publicationYear
-      );
-      setRenderedCount(20);
-      setFullData(data);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Filter data based on search query
   useEffect(() => {
+    console.log({ initialFullData });
+
     if (!searchQuery.trim()) {
-      setFilteredData(fullData);
+      setFilteredData(initialFullData);
       return;
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = fullData.filter((doc) => {
+    const filtered = initialFullData.filter((doc) => {
       return (
         doc.title?.toLowerCase().includes(query) ||
         doc.authors?.toLowerCase().includes(query) ||
@@ -105,7 +84,7 @@ const CorpusTable = ({ initialFullData = [], initialRenderedCount = 20 }) => {
 
     setFilteredData(filtered);
     setRenderedCount(20); // Reset to first 20 rows when filtering
-  }, [searchQuery, fullData]);
+  }, [searchQuery, initialFullData]);
 
   useEffect(() => {
     setData(filteredData.slice(0, renderedCount));
