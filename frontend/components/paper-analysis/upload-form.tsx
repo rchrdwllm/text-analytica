@@ -63,6 +63,17 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
     }
   };
 
+  const handleClear = () => {
+    form.reset();
+    setSelectedFile(null);
+    setDisabled(false);
+    setError(null);
+    onAnalysis?.(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const onSubmit = (data: UploadFormSchemaType) => {
     (async () => {
       setError(null);
@@ -83,6 +94,8 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
       }
     })();
   };
+
+  const hasInput = !!rawSummary || !!selectedFile;
 
   return (
     <article className="space-y-4 bg-card p-4 rounded-lg">
@@ -146,6 +159,17 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
           >
             {loading ? "Analyzing…" : "Analyze Paper"}
           </Button>
+          {hasInput && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleClear}
+              disabled={loading}
+            >
+              Clear
+            </Button>
+          )}
         </form>
       </Form>
       {error && (
