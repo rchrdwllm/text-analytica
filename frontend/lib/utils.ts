@@ -22,6 +22,31 @@ export const callApi = async (endpoint: string) => {
   }
 };
 
+export const callApiBlob = async (
+  endpoint: string,
+  signal?: AbortSignal
+) => {
+  const url = `${
+    process.env.NEXT_PUBLIC_BACKEND_URL || `http://127.0.0.1:${PORT}`
+  }${endpoint}`;
+
+  try {
+    const res = await axios.get(url, {
+      responseType: "blob",
+      signal,
+    });
+
+    return { success: res.data };
+  } catch (error) {
+    if (axios.isCancel(error)) {
+      return { error, cancelled: true };
+    }
+    console.error(`API call to ${endpoint} failed:`, error);
+
+    return { error, cancelled: false };
+  }
+};
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

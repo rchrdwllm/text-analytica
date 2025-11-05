@@ -1,4 +1,5 @@
 from http import HTTPStatus
+import io
 from pathlib import Path
 from typing import Any
 import pandas as pd
@@ -224,43 +225,49 @@ def corpus_documents():
     """
     Returns the corpus documents with their topics.
     """
-    documents = []
 
-    # Iterate through all topics to get documents with their dominant topics
-    for group_name, (model, num_topics, df) in all_topics.items():
-        for _, row in df.iterrows():
-            # Get dominant topic for this document if processed_summary exists
-            topics_str = ""
-            if "processed_summary" in df.columns and row.get("processed_summary"):
-                bow = model.id2word.doc2bow(row["processed_summary"])
-                topic_distribution = model.get_document_topics(bow)
+    print("Loading api/corpus-documents")
+    if (to_return := load_pickle("corpus_documents.pkl")) is None:
+        to_return = []
 
-                if topic_distribution:
-                    # Get top 3 topics for this document
-                    top_topics = sorted(
-                        topic_distribution, key=lambda x: x[1], reverse=True
-                    )[:3]
-                    topic_keywords = []
-                    for topic_id, prob in top_topics:
-                        # Get top 5 words for this topic
-                        words = [word for word, _ in model.show_topic(topic_id, topn=5)]
-                        topic_keywords.append(f"{', '.join(words)} ({prob:.2f})")
-                    topics_str = " | ".join(topic_keywords)
+        # Iterate through all topics to get documents with their dominant topics
+        for group_name, (model, num_topics, df) in all_topics.items():
+            for _, row in df.iterrows():
+                # Get dominant topic for this document if processed_summary exists
+                topics_str = ""
 
-            documents.append(
-                {
-                    "title": row["title"],
-                    "authors": parse_authors_field(row.get("authors")),
-                    "publicationYear": (
-                        parse_date(row["published_date"])[2]
-                        if "published_date" in row
-                        else group_name.split("-")[0]
-                    ),
-                    "topics": topics_str,
-                }
-            )
+                if "processed_summary" in df.columns and row.get("processed_summary"):
+                    bow = model.id2word.doc2bow(row["processed_summary"])
+                    topic_distribution = model.get_document_topics(bow)
 
-    return jsonify(documents), 200
+                    if topic_distribution:
+                        # Get top 3 topics for this document
+                        top_topics = sorted(
+                            topic_distribution, key=lambda x: x[1], reverse=True
+                        )[:3]
+                        topic_keywords = []
+                        for topic_id, prob in top_topics:
+                            # Get top 5 words for this topic
+                            words = [word for word, _ in model.show_topic(topic_id, topn=3)]
+                            topic_keywords.append(f"{', '.join(words)} ({prob:.2f})")
+                        topics_str = " | ".join(topic_keywords)
+
+                to_return.append(
+                    {
+                        "title": row["title"],
+                        "authors": parse_authors_field(row.get("authors")),
+                        "publicationYear": (
+                            parse_date(row["published_date"])[2]
+                            if "published_date" in row
+                            else group_name.split("-")[0]
+                        ),
+                        "topics": topics_str,
+                    }
+                )
+
+        save_pickle("corpus_documents.pkl", to_return)
+
+    return jsonify(to_return), 200
 
 
 @app.route("/api/topic-count-per-group")
@@ -299,16 +306,16 @@ def trending_topics_per_year():
 
             # Calculate topic prevalence by counting how many documents have this as dominant topic
             topic_count = 0
-            if "summary" in df.columns:
-                for _, row in df.iterrows():
-                    if row.get("summary"):
-                        processed_summary = preprocess_text(row.get("summary"))
-                        bow = model.id2word.doc2bow(processed_summary)
-                        doc_topics = model.get_document_topics(bow)
-                        if doc_topics:
-                            dominant_topic = max(doc_topics, key=lambda x: x[1])[0]
-                            if dominant_topic == topic_id:
-                                topic_count += 1
+            if "procseed_summary" not in df.columns: continue
+
+            for _, row in df.iterrows():
+                if (processed_summary := row.get("processed_summary")):
+                    bow = model.id2word.doc2bow(processed_summary)
+                    doc_topics = model.get_document_topics(bow)
+                    if doc_topics:
+                        dominant_topic = max(doc_topics, key=lambda x: x[1])[0]
+                        if dominant_topic == topic_id:
+                            topic_count += 1
 
             topics_data.append(
                 {
@@ -333,82 +340,79 @@ def trending_topics_per_year():
 
 @app.route("/api/corpus-topics")
 def corpus_topics():
-    """
-    Returns topics per year and a single overall word cloud for the entire corpus.
-    """
-    topics_by_year = []
-    # Aggregate ALL words across ALL topics and ALL years for overall word cloud
-    overall_word_weights = {}
+    topics_by_group = []
 
     for group_name, (model, num_topics, df) in all_topics.items():
-        topics_list = []
-
-        for topic_id in range(num_topics):
-            # Get top 10 words for this topic
-            top_words = model.show_topic(topic_id, topn=10)
-
-            # Count documents with this as dominant topic
-            doc_count = 0
-            if "processed_summary" in df.columns:
-                for _, row in df.iterrows():
-                    if row.get("processed_summary"):
-                        bow = model.id2word.doc2bow(row["processed_summary"])
-                        doc_topics = model.get_document_topics(bow)
-                        if doc_topics:
-                            dominant_topic = max(doc_topics, key=lambda x: x[1])[0]
-                            if dominant_topic == topic_id:
-                                doc_count += 1
-
-            # Get top 5 words for label
-            top_5_words = ", ".join([w for w, _ in top_words[:5]])
-
-            topics_list.append(
-                {
-                    "topic_id": topic_id,
-                    "label": f"Topic {topic_id + 1}: {top_5_words}",
-                    "document_count": doc_count
-                }
-            )
-            # Accumulate words for overall word cloud
-            for word, weight in top_words:
-                if word in overall_word_weights:
-                    overall_word_weights[word] += weight
-                else:
-                    overall_word_weights[word] = weight
-
-        topics_by_year.append({
-            "year": group_name,
-            "topics": topics_list,
+        topics_by_group.append({
+            "group_name": group_name,
+            "topics": num_topics,
             "total_documents": len(df)
         })
 
-    # Prepare overall word cloud (top 100 words across entire corpus)
-    sorted_overall = sorted(
-        overall_word_weights.items(),
-        key=lambda x: x[1],
-        reverse=True
-    )[:100]
+    return jsonify(topics_by_group)
 
-    # Normalize weights to 0-100 scale for word cloud
-    if sorted_overall:
-        max_weight = max([weight for _, weight in sorted_overall])
-        min_weight = min([weight for _, weight in sorted_overall])
-        weight_range = max_weight - min_weight if max_weight != min_weight else 1
 
-        overall_wordcloud = [
-            {
-                "text": word,
-                "value": float(((weight - min_weight) / weight_range) * 100)
-            }
-            for word, weight in sorted_overall
-        ]
-    else:
-        overall_wordcloud = []
+@app.route("/api/corpus-topics/<year_group>", methods=["GET"])
+def corpus_topics_detail(year_group):
+    """
+    Returns detailed topics with documents and coherence scores for a specific year group.
+    Schema: [{"topic": string, "documents": [{"title": string}], "coherence": number}]
+    """
+    print(f"Fetching topics for year group: {year_group}")
 
-    return jsonify({
-        "topics_by_year": topics_by_year,
-        "wordcloud": overall_wordcloud  # Single word cloud for ENTIRE corpus
-    })
+    # Find the model and data for the specified year group
+    if year_group not in all_topics:
+        return jsonify({"error": f"Year group '{year_group}' not found"}), HTTPStatus.NOT_FOUND
+
+    model, num_topics, df = all_topics[year_group]
+
+    result = []
+
+    # Vectorized computation: process all documents at once to find dominant topics
+    if "processed_summary" in df.columns:
+        # Get dominant topics for all documents
+        def get_dominant_topic(summary):
+            if not summary:
+                return -1
+            bow = model.id2word.doc2bow(summary)
+            if not bow:
+                return -1
+            doc_topics = model.get_document_topics(bow)
+            if doc_topics:
+                return max(doc_topics, key=lambda x: x[1])[0]
+            return -1
+
+        valid_summaries = df['processed_summary'].notna()
+        df_copy = df[valid_summaries].copy()
+        df_copy['dominant_topic'] = df_copy['processed_summary'].apply(get_dominant_topic)
+
+        # Group documents by dominant topic
+        for topic_id in range(num_topics):
+            # Get top words for this topic to create the topic label
+            topic_words = model.show_topic(topic_id, topn=5)
+            topic_label = ", ".join([word for word, _ in topic_words])
+
+            # Get documents where this is the dominant topic
+            topic_docs = df_copy[df_copy['dominant_topic'] == topic_id]
+
+            # Limit to top 10 documents for this topic
+            documents = []
+            for _, row in topic_docs.head(5).iterrows():
+                documents.append({
+                    "title": row.get("title", "Unknown")
+                })
+
+            # Calculate topic coherence (using a simple approximation based on topic probability)
+            # For LDA models, we can use the average probability of top words as a coherence proxy
+            coherence_score = sum([weight for _, weight in topic_words]) / len(topic_words)
+
+            result.append({
+                "topic": topic_label,
+                "documents": documents,
+                "coherence": float(coherence_score)
+            })
+
+    return jsonify(result)
 
 
 @app.route("/api/author-networks", methods=["POST"])
@@ -831,61 +835,86 @@ def paper_analysis():
         return jsonify({"error": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR
 
 
-@app.route("/api/corpus-wordcloud")
-def corpus_wordcloud():
+@app.route("/api/corpus-wordcloud/<year_group>", methods=["GET"])
+def corpus_wordcloud(year_group):
     """
     Generates a word cloud from the entire corpus.
     Returns the PNG file. Caches the result to avoid recomputation.
     """
-    wordcloud_path = "corpus_wordcloud.png"
-
-    # Check if cached file exists
-    if os.path.exists(wordcloud_path):
-        return send_file(wordcloud_path, mimetype='image/png')
 
     try:
+        lda_model: LdaMulticore | None = None
+        num_topics: int | None = None
+        for group, (model, topic_count, df) in all_topics.items():
+            if group == year_group:
+                lda_model = model
+                num_topics = topic_count
+                break
+
+        if lda_model is None or num_topics is None:
+            return { "error": f"Group {year_group} not found" }, HTTPStatus.NOT_FOUND
+
         # Collect all words from all documents across all year groups
-        all_words = []
-        
-        for group_name, (model, num_topics, df) in all_topics.items():
-            if "processed_summary" in df.columns:
-                for _, row in df.iterrows():
-                    if row.get("processed_summary") and isinstance(row["processed_summary"], list):
-                        all_words.extend(row["processed_summary"])
-            elif "summary" in df.columns:
-                # Process summaries if not already processed
-                for _, row in df.iterrows():
-                    if row.get("summary"):
-                        processed = preprocess_text(row["summary"])
-                        all_words.extend(processed)
-        
-        if not all_words:
-            return jsonify({"error": "No words found in corpus"}), HTTPStatus.BAD_REQUEST
-        
-        # Count word frequencies
-        word_freq = Counter(all_words)
-        
-        # Generate word cloud
-        wordcloud = WordCloud(
-            width=1600,
-            height=800,
-            background_color='white',
-            colormap='viridis',
-            relative_scaling=0.5,
-            min_font_size=10,
-            max_words=200,
-            prefer_horizontal=0.7
-        ).generate_from_frequencies(word_freq)
-        
+        print(f"\n{'='*70}")
+        print(f"Word Clouds for Year Group: {year_group}")
+        print(f"{'='*70}\n")
+
+        # Calculate grid size for subplots
+        cols = 3
+        rows = (num_topics + cols - 1) // cols  # Ceiling division
+
+        fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))
+        fig.suptitle(f'Topic Word Clouds - {year_group}', fontsize=16, fontweight='bold')
+
+        # Flatten axes array for easier iteration
+        if rows == 1 and cols == 1:
+            axes = [axes]
+        elif rows == 1 or cols == 1:
+            axes = axes.flatten()
+        else:
+            axes = axes.flatten()
+
+        for topic_id in range(num_topics):
+            ax = axes[topic_id]
+
+            # Get top 50 words for this topic
+            topic_words = lda_model.show_topic(topic_id, topn=50)
+
+            # Create word frequency dictionary
+            word_freq = {word: float(weight) for word, weight in topic_words}
+
+            # Generate word cloud
+            wordcloud = WordCloud(
+                width=400,
+                height=300,
+                background_color='white',
+                colormap='viridis',
+                relative_scaling=0.5,
+                min_font_size=8
+            ).generate_from_frequencies(word_freq)
+
+            # Display word cloud
+            ax.imshow(wordcloud, interpolation='bilinear')
+            ax.axis('off')
+
+            # Get top 3 words for title
+            top_words = ', '.join([word for word, _ in topic_words[:3]])
+            ax.set_title(f'Topic {topic_id + 1}: {top_words}', fontsize=10, fontweight='bold')
+
+        # Hide any unused subplots
+        for idx in range(num_topics, len(axes)):
+            axes[idx].axis('off')
+
+        # Adjust layout and save the figure with all subplots
+        plt.tight_layout()
+
         # Save to file
-        plt.figure(figsize=(20, 10))
-        plt.imshow(wordcloud, interpolation='bilinear')
-        plt.axis('off')
-        plt.tight_layout(pad=0)
-        plt.savefig(wordcloud_path, dpi=150, bbox_inches='tight', facecolor='white')
-        plt.close()
-        
-        return send_file(wordcloud_path, mimetype='image/png')
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+
+        return send_file(buf, mimetype='image/png')
 
     except Exception as e:
         return jsonify({"error": str(e)}), HTTPStatus.INTERNAL_SERVER_ERROR

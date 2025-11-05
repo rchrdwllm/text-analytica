@@ -41,3 +41,9 @@ export type AnalysisResult = {
   similar_documents: SimilarDocument[];
   topic_similarity: TopicSimilarityItem[];
 };
+
+export type TopicSummary = {
+  "group_name": string,
+  "topics": number,
+  "total_documents": number,
+}
