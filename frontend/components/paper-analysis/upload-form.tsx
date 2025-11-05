@@ -18,12 +18,14 @@ import {
   UploadFormSchema,
   UploadFormSchemaType,
 } from "@/schemas/UploadFormSchema";
+import { cn } from "@/lib/utils";
 
 type UploadFormProps = {
   onAnalysis?: (res: any) => void;
 };
 
 const UploadForm = ({ onAnalysis }: UploadFormProps) => {
+  const [disabled, setDisabled] = useState(false);
   const form = useForm<UploadFormSchemaType>({
     defaultValues: {
       rawSummary: "",
@@ -63,6 +65,7 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
 
         // propagate result to parent if provided
         onAnalysis?.(result);
+        setDisabled(true);
       } catch (err: any) {
         setError(err?.message || String(err));
       } finally {
@@ -103,7 +106,9 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
             control={form.control}
             name="file"
             render={() => (
-              <FormItem>
+              <FormItem
+                className={cn(disabled ? "opacity-50 pointer-events-none" : "")}
+              >
                 <FormControl>
                   <div
                     onClick={handleFileUploadClick}
@@ -119,7 +124,11 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading || disabled}
+          >
             {loading ? "Analyzing…" : "Analyze Paper"}
           </Button>
         </form>

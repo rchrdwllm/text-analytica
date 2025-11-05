@@ -88,8 +88,6 @@ const TrendingTopicsPerYear = ({
     }));
   });
 
-  console.log({ trendingTopics });
-
   return (
     <article className="flex flex-col space-y-4 bg-card p-4 rounded-lg h-full">
       <h2 className="font-medium text-lg">Trending Topics per Year</h2>
