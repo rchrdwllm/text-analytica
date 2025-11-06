@@ -195,6 +195,7 @@ const SocialNetwork = () => {
         g.attr("transform", event.transform);
       });
 
+    svg.call(zoom.transform, d3.zoomIdentity);
     svg.call(zoom);
 
     // Create links
