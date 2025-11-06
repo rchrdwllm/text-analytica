@@ -162,7 +162,7 @@ const UploadForm = ({ onAnalysis }: UploadFormProps) => {
           {hasInput && (
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               className="w-full"
               onClick={handleClear}
               disabled={loading}
